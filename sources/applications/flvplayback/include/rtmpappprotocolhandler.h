@@ -24,6 +24,8 @@
 
 #include "protocols/rtmp/basertmpappprotocolhandler.h"
 
+#include <pqxx/pqxx>
+
 namespace app_flvplayback {
 
 	class RTMPAppProtocolHandler
@@ -37,6 +39,20 @@ namespace app_flvplayback {
 	private:
 		bool ProcessGetAvailableFlvs(BaseRTMPProtocol *pFrom, Variant &request);
 		bool ProcessInsertMetadata(BaseRTMPProtocol *pFrom, Variant &request);
+                Variant connections; //keeps track of connection data, such as time...
+                void client_close(uint32_t id); //does logging and other fun
+                bool ProcessInvokePublish(BaseRTMPProtocol *pFrom,Variant &request);
+                bool ProcessInvokeDeleteStream(BaseRTMPProtocol *pFrom,Variant &request);
+                bool ProcessInvokePlay(BaseRTMPProtocol *pFrom,Variant &request);
+                bool ProcessInvokeCloseStream(BaseRTMPProtocol *pFrom,Variant &request);
+                bool ProcessInvoke(BaseRTMPProtocol *pFrom, Variant &request);
+                void UnRegisterProtocol(BaseProtocol *pProtocol);
+                string dbHost;
+                string dbUser;
+                string dbPass;
+                string db;
+                string dbconstring;
+                pqxx::connection *dbconn;
 	};
 }
 #endif	/* _RTMPAPPPROTOCOLHANDLER_H */
