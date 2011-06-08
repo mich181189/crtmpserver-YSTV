@@ -100,6 +100,10 @@ configuration=
 			description="FLV Playback Sample",
 			name="flvplayback",
 			protocol="dynamiclinklibrary",
+			dbHost="DB Host",
+                        dbUser="Username",
+                        dbPass="Password",
+                        db="Db Name",
 			aliases=
 			{
 				"simpleLive",
@@ -136,8 +140,8 @@ configuration=
 			externalStreams = 
 			{
 				--[[{
-					uri="mms://lr1w.latvijasradio.lv/pplr3s",
-					localStreamName="myMms"
+					uri="rtmp://ystvstrm1.york.ac.uk/live/stream1",
+					localStreamName="ystv"
 				},
 				{
 					uri="rtsp://a1956.l1857055475.c18570.g.lq.akamaistream.net/D/1956/18570/v0001/reflector:55475",
