@@ -140,7 +140,6 @@ bool setFdKeepAlive(int32_t fd) {
 bool setFdNoNagle(int32_t fd) {
 	int32_t one = 1;
 	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *) & one, sizeof (one)) != 0) {
-		FATAL("Unable to disable Nagle");
 		return false;
 	}
 	return true;
@@ -161,6 +160,33 @@ bool setFdReuseAddress(int32_t fd) {
 	return true;
 }
 
+bool setFdTTL(int32_t fd, uint8_t ttl) {
+	int temp = ttl;
+	if (setsockopt(fd, IPPROTO_IP, IP_TTL, &temp, sizeof (temp)) != 0) {
+		int err = errno;
+		WARN("Unable to set IP_TTL: %"PRIu8"; error was %"PRId32" %s", ttl, err, strerror(err));
+	}
+	return true;
+}
+
+bool setFdMulticastTTL(int32_t fd, uint8_t ttl) {
+	int temp = ttl;
+	if (setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, &temp, sizeof (temp)) != 0) {
+		int err = errno;
+		WARN("Unable to set IP_MULTICAST_TTL: %"PRIu8"; error was %"PRId32" %s", ttl, err, strerror(err));
+	}
+	return true;
+}
+
+bool setFdTOS(int32_t fd, uint8_t tos) {
+	int temp = tos;
+	if (setsockopt(fd, IPPROTO_IP, IP_TOS, &temp, sizeof (temp)) != 0) {
+		int err = errno;
+		WARN("Unable to set IP_TOS: %"PRIu8"; error was %"PRId32" %s", tos, err, strerror(err));
+	}
+	return true;
+}
+
 bool setFdOptions(int32_t fd) {
 	if (!setFdNonBlock(fd)) {
 		FATAL("Unable to set non block");
@@ -178,8 +204,7 @@ bool setFdOptions(int32_t fd) {
 	}
 
 	if (!setFdNoNagle(fd)) {
-		FATAL("Unable to disable Nagle algorithm");
-		return false;
+		WARN("Unable to disable Nagle algorithm");
 	}
 
 	if (!setFdReuseAddress(fd)) {
@@ -195,6 +220,31 @@ bool deleteFile(string path) {
 		FATAL("Unable to delete file `%s`", STR(path));
 		return false;
 	}
+	return true;
+}
+
+bool deleteFolder(string path, bool force) {
+	if (!force) {
+		return deleteFile(path);
+	} else {
+		string command = format("rm -rf %s", STR(path));
+		if (system(STR(command)) != 0) {
+			FATAL("Unable to delete folder %s", STR(path));
+			return false;
+		}
+		return true;
+	}
+}
+
+bool createFolder(string path, bool recursive) {
+	string command = format("mkdir %s %s",
+			recursive ? "-p" : "",
+			STR(path));
+	if (system(STR(command)) != 0) {
+		FATAL("Unable to create folder %s", STR(path));
+		return false;
+	}
+
 	return true;
 }
 
@@ -274,6 +324,10 @@ void rTrim(string &value) {
 void trim(string &value) {
 	lTrim(value);
 	rTrim(value);
+}
+
+int8_t getCPUCount() {
+	return sysconf(_SC_NPROCESSORS_ONLN);
 }
 
 map<string, string> mapping(string str, string separator1, string separator2, bool trimStrings) {
@@ -393,6 +447,7 @@ bool listFolder(string path, vector<string> &result, bool normalizeAllPaths,
 			if (recursive) {
 				if (!listFolder(entry, result, normalizeAllPaths, includeFolders, recursive)) {
 					FATAL("Unable to list folder");
+					closedir(pDir);
 					return false;
 				}
 			}
@@ -401,6 +456,7 @@ bool listFolder(string path, vector<string> &result, bool normalizeAllPaths,
 		}
 	}
 
+	closedir(pDir);
 	return true;
 }
 

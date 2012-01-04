@@ -31,6 +31,7 @@
 #include "protocols/rtmp/streaming/infilertmpstream.h"
 #include "protocols/rtmp/streaming/rtmpstream.h"
 #include "streaming/streamstypes.h"
+#include "protocols/rtmp/monitorrtmpprotocol.h"
 
 #define MAX_RTMP_OUTPUT_BUFFER 1024*256
 
@@ -66,9 +67,8 @@ BaseRTMPProtocol::BaseRTMPProtocol(uint64_t protocolType)
 	_winAckSize = RECEIVED_BYTES_COUNT_REPORT_CHUNK;
 	_nextReceivedBytesCountReport = _winAckSize;
 	for (uint32_t i = 0; i < MAX_CHANNELS_COUNT; i++) {
-		memset(&_channels[i], 0, sizeof (Channel));
 		_channels[i].id = i;
-		_channels[i].lastOutStreamId = 0xffffffff;
+		_channels[i].Reset();
 	}
 	_selectedChannel = -1;
 	_inboundChunkSize = 128;
@@ -84,6 +84,10 @@ BaseRTMPProtocol::BaseRTMPProtocol(uint64_t protocolType)
 	_pSignaledRTMPOutNetStream = NULL;
 	_rxInvokes = 0;
 	_txInvokes = 0;
+
+#ifdef ENFORCE_RTMP_OUTPUT_CHECKS
+	_pMonitor = new MonitorRTMPProtocol(MAX_STREAMS_COUNT, MAX_CHANNELS_COUNT);
+#endif /* ENFORCE_RTMP_OUTPUT_CHECKS */
 }
 
 BaseRTMPProtocol::~BaseRTMPProtocol() {
@@ -103,6 +107,12 @@ BaseRTMPProtocol::~BaseRTMPProtocol() {
 		delete pStream;
 		_inFileStreams.erase(pStream);
 	}
+#ifdef ENFORCE_RTMP_OUTPUT_CHECKS
+	if (_pMonitor != NULL) {
+		delete _pMonitor;
+		_pMonitor = NULL;
+	}
+#endif /* ENFORCE_RTMP_OUTPUT_CHECKS */
 }
 
 bool BaseRTMPProtocol::Initialize(Variant &parameters) {
@@ -191,32 +201,56 @@ void BaseRTMPProtocol::SetApplication(BaseClientApplication *pApplication) {
 	}
 }
 
-void BaseRTMPProtocol::GetStats(Variant &info) {
-	BaseProtocol::GetStats(info);
+void BaseRTMPProtocol::GetStats(Variant &info, uint32_t namespaceId) {
+	BaseProtocol::GetStats(info, namespaceId);
 	info["rxInvokes"] = _rxInvokes;
 	info["txInvokes"] = _txInvokes;
 	for (uint32_t i = 0; i < MAX_STREAMS_COUNT; i++) {
 		if (_streams[i] != NULL) {
 			Variant si;
-			_streams[i]->GetStats(si);
+			_streams[i]->GetStats(si, namespaceId);
 			info["streams"].PushToArray(si);
 		}
 	}
 
 	FOR_MAP(_inFileStreams, InFileRTMPStream *, InFileRTMPStream *, i) {
 		Variant si;
-		MAP_VAL(i)->GetStats(si);
+		MAP_VAL(i)->GetStats(si, namespaceId);
 		info["streams"].PushToArray(si);
 	}
 }
 
+bool BaseRTMPProtocol::ResetChannel(uint32_t channelId) {
+	if (channelId >= MAX_CHANNELS_COUNT) {
+		FATAL("Invalid channel id in reset message: %"PRIu32, channelId);
+		return false;
+	}
+	_channels[channelId].Reset();
+	return true;
+}
+
 bool BaseRTMPProtocol::SendMessage(Variant & message) {
+#ifdef ENFORCE_RTMP_OUTPUT_CHECKS
+	_intermediateBuffer.IgnoreAll();
+	if (!_rtmpProtocolSerializer.Serialize(_channels[(uint32_t) VH_CI(message)],
+			message, _intermediateBuffer, _outboundChunkSize)) {
+		FATAL("Unable to serialize RTMP message");
+		return false;
+	}
+	if (!_pMonitor->Feed(_intermediateBuffer)) {
+		ASSERT("Server sent invalid data");
+	}
+	_outputBuffer.ReadFromBuffer(
+			GETIBPOINTER(_intermediateBuffer),
+			GETAVAILABLEBYTESCOUNT(_intermediateBuffer));
+#else  /* ENFORCE_RTMP_OUTPUT_CHECKS */
 	//2. Send the message
 	if (!_rtmpProtocolSerializer.Serialize(_channels[(uint32_t) VH_CI(message)],
 			message, _outputBuffer, _outboundChunkSize)) {
 		FATAL("Unable to serialize RTMP message");
 		return false;
 	}
+#endif  /* ENFORCE_RTMP_OUTPUT_CHECKS */
 
 	_txInvokes++;
 
@@ -226,18 +260,44 @@ bool BaseRTMPProtocol::SendMessage(Variant & message) {
 
 bool BaseRTMPProtocol::SendRawData(Header &header, Channel &channel, uint8_t *pData,
 		uint32_t length) {
+#ifdef ENFORCE_RTMP_OUTPUT_CHECKS
+	_intermediateBuffer.IgnoreAll();
+	if (!header.Write(channel, _intermediateBuffer)) {
+		FATAL("Unable to serialize message header");
+		return false;
+	}
+
+	_intermediateBuffer.ReadFromBuffer(pData, length);
+	if (!_pMonitor->Feed(_intermediateBuffer)) {
+		ASSERT("Server sent invalid data");
+	}
+	_outputBuffer.ReadFromBuffer(
+			GETIBPOINTER(_intermediateBuffer),
+			GETAVAILABLEBYTESCOUNT(_intermediateBuffer));
+#else /* ENFORCE_RTMP_OUTPUT_CHECKS */
 	if (!header.Write(channel, _outputBuffer)) {
 		FATAL("Unable to serialize message header");
 		return false;
 	}
 
 	_outputBuffer.ReadFromBuffer(pData, length);
-
+#endif /* ENFORCE_RTMP_OUTPUT_CHECKS */
 	return EnqueueForOutbound();
 }
 
 bool BaseRTMPProtocol::SendRawData(uint8_t *pData, uint32_t length) {
+#ifdef ENFORCE_RTMP_OUTPUT_CHECKS
+	_intermediateBuffer.IgnoreAll();
+	_intermediateBuffer.ReadFromBuffer(pData, length);
+	if (!_pMonitor->Feed(_intermediateBuffer)) {
+		ASSERT("Server sent invalid data");
+	}
+	_outputBuffer.ReadFromBuffer(
+			GETIBPOINTER(_intermediateBuffer),
+			GETAVAILABLEBYTESCOUNT(_intermediateBuffer));
+#else /* ENFORCE_RTMP_OUTPUT_CHECKS */
 	_outputBuffer.ReadFromBuffer(pData, length);
+#endif /* ENFORCE_RTMP_OUTPUT_CHECKS */
 	return EnqueueForOutbound();
 }
 
@@ -252,8 +312,8 @@ uint32_t BaseRTMPProtocol::GetOutboundChunkSize() {
 }
 
 bool BaseRTMPProtocol::SetInboundChunkSize(uint32_t chunkSize) {
-	WARN("Chunk size changed for RTMP connection %p: %u->%u", this,
-			_inboundChunkSize, chunkSize);
+	/*WARN("Chunk size changed for RTMP connection %p: %u->%u", this,
+			_inboundChunkSize, chunkSize);*/
 	_inboundChunkSize = chunkSize;
 	for (uint32_t i = 0; i < MAX_STREAMS_COUNT; i++) {
 		if (_streams[i] != NULL) {
@@ -298,11 +358,6 @@ bool BaseRTMPProtocol::CloseStream(uint32_t streamId, bool createNeutralStream) 
 		FATAL("Try to close a NULL stream");
 		return false;
 	}
-
-	if (_streams[streamId]->GetType() == ST_NEUTRAL_RTMP) {
-		return true;
-	}
-
 
 	if (TAG_KIND_OF(_streams[streamId]->GetType(), ST_OUT_NET_RTMP)) {
 		//2. Remove it from signaled streams
@@ -588,15 +643,17 @@ bool BaseRTMPProtocol::ProcessBytes(IOBuffer &buffer) {
 					}
 					case 1:
 					{
-						if (availableBytesCount < 3) {
-							FINEST("Not enough data");
-							return true;
-						}
-						_selectedChannel = 64 + GETIBPOINTER(buffer)[1] + GETIBPOINTER(buffer)[2];
-						_channels[_selectedChannel].lastInHeaderType = GETIBPOINTER(buffer)[0] >> 6;
-						buffer.Ignore(3);
-						availableBytesCount -= 3;
-						break;
+						//						if (availableBytesCount < 3) {
+						//							FINEST("Not enough data");
+						//							return true;
+						//						}
+						//						_selectedChannel = GETIBPOINTER(buffer)[2]*256 + GETIBPOINTER(buffer)[1] + 64;
+						//						_channels[_selectedChannel].lastInHeaderType = GETIBPOINTER(buffer)[0] >> 6;
+						//						buffer.Ignore(3);
+						//						availableBytesCount -= 3;
+						//						break;
+						FATAL("The server doesn't support channel ids bigger than 319");
+						return false;
 					};
 					default:
 					{
@@ -610,6 +667,11 @@ bool BaseRTMPProtocol::ProcessBytes(IOBuffer &buffer) {
 			}
 		}
 
+		if (_selectedChannel >= MAX_CHANNELS_COUNT) {
+			FATAL("Bogus connection. Drop it like is hot");
+			return false;
+		}
+
 		Channel &channel = _channels[_selectedChannel];
 		Header &header = channel.lastInHeader;
 
@@ -619,24 +681,28 @@ bool BaseRTMPProtocol::ProcessBytes(IOBuffer &buffer) {
 				FATAL("Unable to read header");
 				return false;
 			} else {
-				if (header.readCompleted) {
-					channel.state = CS_PAYLOAD;
-					switch (channel.lastInHeaderType) {
-						case HT_FULL:
-							channel.lastInAbsTs = H_TS(header);
-							break;
-						case HT_SAME_STREAM:
-						case HT_SAME_LENGTH_AND_STREAM:
-							channel.lastInAbsTs += H_TS(header);
-							break;
-						case HT_CONTINUATION:
-							if (channel.lastInProcBytes == 0) {
-								channel.lastInAbsTs += H_TS(header);
-							}
-							break;
-					}
-				} else {
+				if (!header.readCompleted)
 					return true;
+				channel.state = CS_PAYLOAD;
+				switch (channel.lastInHeaderType) {
+					case HT_FULL:
+					{
+						channel.lastInAbsTs = H_TS(header);
+						break;
+					}
+					case HT_SAME_STREAM:
+					case HT_SAME_LENGTH_AND_STREAM:
+					{
+						channel.lastInAbsTs += H_TS(header);
+						break;
+					}
+					case HT_CONTINUATION:
+					{
+						if (channel.lastInProcBytes == 0) {
+							channel.lastInAbsTs += H_TS(header);
+						}
+						break;
+					}
 				}
 			}
 		}
@@ -645,127 +711,106 @@ bool BaseRTMPProtocol::ProcessBytes(IOBuffer &buffer) {
 			uint32_t tempSize = H_ML(header) - channel.lastInProcBytes;
 			tempSize = (tempSize >= _inboundChunkSize) ? _inboundChunkSize : tempSize;
 			uint32_t availableBytes = GETAVAILABLEBYTESCOUNT(buffer);
+			if (tempSize > availableBytes)
+				return true;
+			channel.state = CS_HEADER;
+			_selectedChannel = -1;
 			switch (H_MT(header)) {
 				case RM_HEADER_MESSAGETYPE_VIDEODATA:
 				{
-					if (tempSize <= availableBytes) {
-						channel.state = CS_HEADER;
-						_selectedChannel = -1;
-
-						//TODO: THIS is anti-performance fix. It works
-						//but it needs to be replaced with other means of detecting
-						//the type of stream. Calling a function for each packet
-						//is not a nice thing to do
-						if (H_SI(header) >= MAX_STREAMS_COUNT) {
-							FATAL("Incorrect stream index");
-							return false;
-						}
-						if ((_streams[H_SI(header)] != NULL)
-								&& (_streams[H_SI(header)]->GetType() == ST_IN_NET_RTMP)) {
-							if (!((InNetRTMPStream *) _streams[H_SI(header)])->FeedData(
-									GETIBPOINTER(buffer), //pData,
-									tempSize, //dataLength,
-									channel.lastInProcBytes, //processedLength,
-									H_ML(header), //totalLength,
-									channel.lastInAbsTs, //absoluteTimestamp,
-									false //isAudio
-									)) {
-								FATAL("Unable to feed video");
-								return false;
-							}
-						}
-
-						channel.lastInProcBytes += tempSize;
-						if (H_ML(header) == channel.lastInProcBytes) {
-							channel.lastInProcBytes = 0;
-						}
-						if (!buffer.Ignore(tempSize)) {
-							FATAL("V: Unable to ignore %u bytes", tempSize);
-							return false;
-						}
-						break;
-					} else {
-						return true;
+					if (H_SI(header) >= MAX_STREAMS_COUNT) {
+						FATAL("The server doesn't support stream ids bigger than %"PRIu32,
+								(uint32_t) MAX_STREAMS_COUNT);
+						return false;
 					}
+					if ((_streams[H_SI(header)] != NULL)
+							&& (_streams[H_SI(header)]->GetType() == ST_IN_NET_RTMP)) {
+						if (!((InNetRTMPStream *) _streams[H_SI(header)])->FeedData(
+								GETIBPOINTER(buffer), //pData,
+								tempSize, //dataLength,
+								channel.lastInProcBytes, //processedLength,
+								H_ML(header), //totalLength,
+								channel.lastInAbsTs, //absoluteTimestamp,
+								false //isAudio
+								)) {
+							FATAL("Unable to feed video");
+							return false;
+						}
+					}
+
+					channel.lastInProcBytes += tempSize;
+					if (H_ML(header) == channel.lastInProcBytes) {
+						channel.lastInProcBytes = 0;
+					}
+					if (!buffer.Ignore(tempSize)) {
+						FATAL("V: Unable to ignore %u bytes", tempSize);
+						return false;
+					}
+					break;
 				}
 				case RM_HEADER_MESSAGETYPE_AUDIODATA:
 				{
-					if (tempSize <= availableBytes) {
-						channel.state = CS_HEADER;
-						_selectedChannel = -1;
-
-						//TODO: see the todo in the video case
-						if (H_SI(header) >= MAX_STREAMS_COUNT) {
-							FATAL("Incorrect stream index");
-							return false;
-						}
-						if ((_streams[H_SI(header)] != NULL)
-								&& (_streams[H_SI(header)]->GetType() == ST_IN_NET_RTMP)) {
-							if (!((InNetRTMPStream *) _streams[H_SI(header)])->FeedData(
-									GETIBPOINTER(buffer), //pData,
-									tempSize, //dataLength,
-									channel.lastInProcBytes, //processedLength,
-									H_ML(header), //totalLength,
-									channel.lastInAbsTs, //absoluteTimestamp,
-									true //isAudio
-									)) {
-								FATAL("Unable to feed audio");
-								return false;
-							}
-						}
-
-
-						channel.lastInProcBytes += tempSize;
-						if (H_ML(header) == channel.lastInProcBytes) {
-							channel.lastInProcBytes = 0;
-						}
-						if (!buffer.Ignore(tempSize)) {
-							FATAL("A: Unable to ignore %u bytes", tempSize);
-							return false;
-						}
-						break;
-					} else {
-						return true;
+					if (H_SI(header) >= MAX_STREAMS_COUNT) {
+						FATAL("The server doesn't support stream ids bigger than %"PRIu32,
+								(uint32_t) MAX_STREAMS_COUNT);
+						return false;
 					}
+					if ((_streams[H_SI(header)] != NULL)
+							&& (_streams[H_SI(header)]->GetType() == ST_IN_NET_RTMP)) {
+						if (!((InNetRTMPStream *) _streams[H_SI(header)])->FeedData(
+								GETIBPOINTER(buffer), //pData,
+								tempSize, //dataLength,
+								channel.lastInProcBytes, //processedLength,
+								H_ML(header), //totalLength,
+								channel.lastInAbsTs, //absoluteTimestamp,
+								true //isAudio
+								)) {
+							FATAL("Unable to feed audio");
+							return false;
+						}
+					}
+
+
+					channel.lastInProcBytes += tempSize;
+					if (H_ML(header) == channel.lastInProcBytes) {
+						channel.lastInProcBytes = 0;
+					}
+					if (!buffer.Ignore(tempSize)) {
+						FATAL("A: Unable to ignore %u bytes", tempSize);
+						return false;
+					}
+					break;
 				}
 				default:
 				{
-					if (tempSize <= availableBytes) {
-						channel.state = CS_HEADER;
-						_selectedChannel = -1;
-						channel.inputData.ReadFromInputBuffer(buffer, tempSize);
-						channel.lastInProcBytes += tempSize;
-						if (!buffer.Ignore(tempSize)) {
-							FATAL("Unable to ignore %u bytes", tempSize);
+					channel.inputData.ReadFromInputBuffer(buffer, tempSize);
+					channel.lastInProcBytes += tempSize;
+					if (!buffer.Ignore(tempSize)) {
+						FATAL("Unable to ignore %u bytes", tempSize);
+						return false;
+					}
+					if (H_ML(header) == channel.lastInProcBytes) {
+						channel.lastInProcBytes = 0;
+						if (_pProtocolHandler == NULL) {
+							FATAL("RTMP connection no longer associated with an application");
 							return false;
 						}
-						if (H_ML(header) == channel.lastInProcBytes) {
-							channel.lastInProcBytes = 0;
-							if (_pProtocolHandler == NULL) {
-								FATAL("RTMP connection no longer associated with an application");
-								return false;
-							}
-							if (!_pProtocolHandler->InboundMessageAvailable(this, header, channel.inputData)) {
-								FATAL("Unable to send rtmp message to application");
-								return false;
-							}
-							_rxInvokes++;
-
-							if (GETAVAILABLEBYTESCOUNT(channel.inputData) != 0) {
-								FATAL("Invalid message!!! We have leftovers: %u bytes",
-										GETAVAILABLEBYTESCOUNT(channel.inputData));
-								return false;
-							}
-						} else {
+						if (!_pProtocolHandler->InboundMessageAvailable(this, header, channel.inputData)) {
+							FATAL("Unable to send rtmp message to application");
+							return false;
 						}
-						break;
-					} else {
-						return true;
+						_rxInvokes++;
+
+						if (GETAVAILABLEBYTESCOUNT(channel.inputData) != 0) {
+							FATAL("Invalid message!!! We have leftovers: %u bytes",
+									GETAVAILABLEBYTESCOUNT(channel.inputData));
+							return false;
+						}
 					}
+					break;
 				}
 			}
 		}
 	}
 }
 #endif /* HAS_PROTOCOL_RTMP */
-

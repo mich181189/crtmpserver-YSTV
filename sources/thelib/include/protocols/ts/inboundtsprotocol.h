@@ -56,6 +56,7 @@ private:
 	map<uint16_t, PIDDescriptor *> _pidMapping;
 	BaseTSAppProtocolHandler *_pProtocolHandler;
 	bool _stepByStep;
+	map<uint16_t, uint16_t> _unknownPids;
 public:
 	InboundTSProtocol();
 	virtual ~InboundTSProtocol();
@@ -64,6 +65,7 @@ public:
 	virtual bool AllowFarProtocol(uint64_t type);
 	virtual bool AllowNearProtocol(uint64_t type);
 	virtual bool SignalInputData(int32_t recvAmount);
+	virtual bool SignalInputData(IOBuffer &buffer, sockaddr_in *pPeerAddress);
 	virtual bool SignalInputData(IOBuffer &buffer);
 
 	virtual void SetApplication(BaseClientApplication *pApplication);

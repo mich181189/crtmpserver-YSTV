@@ -28,55 +28,82 @@
 #define MAX_RTP_PACKET_SIZE 1350
 
 OutNetRTPUDPH264Stream::OutNetRTPUDPH264Stream(BaseProtocol *pProtocol,
-		StreamsManager *pStreamsManager, string name)
+		StreamsManager *pStreamsManager, string name, bool forceTcp)
 : BaseOutNetRTPUDPStream(pProtocol, pStreamsManager, name) {
+	_forceTcp = forceTcp;
+	if (_forceTcp)
+		_maxRTPPacketSize = 1500;
+	else
+		_maxRTPPacketSize = MAX_RTP_PACKET_SIZE;
+
 	memset(&_videoData, 0, sizeof (_videoData));
-	_videoData.msg_iov = new iovec[2];
-	_videoData.msg_iovlen = 2;
-	_videoData.msg_namelen = sizeof (sockaddr_in);
-	_videoData.msg_iov[0].iov_base = new uint8_t[14];
-	((uint8_t *) _videoData.msg_iov[0].iov_base)[0] = 0x80;
-	EHTONLP(((uint8_t *) _videoData.msg_iov[0].iov_base) + 8, _videoSsrc);
+	_videoData.MSGHDR_MSG_IOV = new IOVEC[2];
+	_videoData.MSGHDR_MSG_IOVLEN = 2;
+	_videoData.MSGHDR_MSG_NAMELEN = sizeof (sockaddr_in);
+	_videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE = new IOVEC_IOV_BASE_TYPE[14];
+	((uint8_t *) _videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE)[0] = 0x80;
+	EHTONLP(((uint8_t *) _videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE) + 8, _videoSsrc);
 	_pSPS = NULL;
 	_SPSLen = 0;
 	_pPPS = NULL;
 	_PPSLen = 0;
 
 	memset(&_audioData, 0, sizeof (_audioData));
-	_audioData.msg_iov = new iovec[3];
-	_audioData.msg_iovlen = 3;
-	_audioData.msg_namelen = sizeof (sockaddr_in);
-	_audioData.msg_iov[0].iov_len = 14;
-	_audioData.msg_iov[0].iov_base = new uint8_t[14];
-	((uint8_t *) _audioData.msg_iov[0].iov_base)[0] = 0x80;
-	((uint8_t *) _audioData.msg_iov[0].iov_base)[1] = 0xe0;
-	EHTONLP(((uint8_t *) _audioData.msg_iov[0].iov_base) + 8, _audioSsrc);
-	_audioData.msg_iov[1].iov_len = 0;
-	_audioData.msg_iov[1].iov_base = new uint8_t[16];
+	_audioData.MSGHDR_MSG_IOV = new IOVEC[3];
+	_audioData.MSGHDR_MSG_IOVLEN = 3;
+	_audioData.MSGHDR_MSG_NAMELEN = sizeof (sockaddr_in);
+	_audioData.MSGHDR_MSG_IOV[0].IOVEC_IOV_LEN = 14;
+	_audioData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE = new IOVEC_IOV_BASE_TYPE[14];
+	((uint8_t *) _audioData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE)[0] = 0x80;
+	((uint8_t *) _audioData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE)[1] = 0xe0;
+	EHTONLP(((uint8_t *) _audioData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE) + 8, _audioSsrc);
+	_audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_LEN = 0;
+	_audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_BASE = new IOVEC_IOV_BASE_TYPE[16];
+
+
 	_audioPacketsCount = 0;
+	_audioDroppedPacketsCount = 0;
+	_audioBytesCount = 0;
+	_videoPacketsCount = 0;
+	_videoDroppedPacketsCount = 0;
+	_videoBytesCount = 0;
 }
 
 OutNetRTPUDPH264Stream::~OutNetRTPUDPH264Stream() {
-	delete[] (uint8_t *) _videoData.msg_iov[0].iov_base;
-	delete[] _videoData.msg_iov;
+	delete[] (uint8_t *) _videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE;
+	delete[] _videoData.MSGHDR_MSG_IOV;
 	memset(&_videoData, 0, sizeof (_videoData));
 	if (_pSPS != NULL)
 		delete[] _pSPS;
 	if (_pPPS != NULL)
 		delete[] _pPPS;
 
-	delete[] (uint8_t *) _audioData.msg_iov[0].iov_base;
-	delete[] (uint8_t *) _audioData.msg_iov[1].iov_base;
-	delete[] _audioData.msg_iov;
+	delete[] (uint8_t *) _audioData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE;
+	delete[] (uint8_t *) _audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_BASE;
+	delete[] _audioData.MSGHDR_MSG_IOV;
 	memset(&_audioData, 0, sizeof (_audioData));
+}
+
+void OutNetRTPUDPH264Stream::GetStats(Variant &info, uint32_t namespaceId) {
+	BaseOutNetStream::GetStats(info, namespaceId);
+	info["audio"]["bytesCount"] = _audioBytesCount;
+	info["audio"]["packetsCount"] = _audioPacketsCount;
+	info["audio"]["droppedPacketsCount"] = _audioDroppedPacketsCount;
+	info["video"]["bytesCount"] = _videoBytesCount;
+	info["video"]["packetsCount"] = _videoPacketsCount;
+	info["video"]["droppedPacketsCount"] = _videoDroppedPacketsCount;
 }
 
 bool OutNetRTPUDPH264Stream::FeedDataVideo(uint8_t *pData, uint32_t dataLength,
 		uint32_t processedLength, uint32_t totalLength,
 		double absoluteTimestamp, bool isAudio) {
+	_videoBytesCount += dataLength;
+	_videoPacketsCount++;
 	//1. Test and see if this is an inbound RTMP stream. If so,
 	//we have to strip out the RTMP 9 bytes header
-	if (_pInStream->GetType() == ST_IN_NET_RTMP) {
+	uint64_t inStreamType = _pInStream->GetType();
+	if ((inStreamType == ST_IN_NET_RTMP)
+			|| (inStreamType == ST_IN_NET_LIVEFLV)) {
 		//2. Test and see if we have a brand new packet
 		if (processedLength == 0) {
 			//3. This must be a payload packet, not codec setup
@@ -103,9 +130,9 @@ bool OutNetRTPUDPH264Stream::FeedDataVideo(uint8_t *pData, uint32_t dataLength,
 
 			//9. Read the composition timestamp and add it to the
 			//absolute timestamp
-			uint32_t compositionTimeStamp=(ENTOHLP(pData+1))&0x00ffffff;
-			absoluteTimestamp+=compositionTimeStamp;
-			
+			uint32_t compositionTimeStamp = (ENTOHLP(pData + 1))&0x00ffffff;
+			absoluteTimestamp += compositionTimeStamp;
+
 			//10. Ignore RTMP header and composition offset
 			pData += 5;
 			dataLength -= 5;
@@ -134,7 +161,7 @@ bool OutNetRTPUDPH264Stream::FeedDataVideo(uint8_t *pData, uint32_t dataLength,
 
 				//15. Feed the NAL unit using RTP FUA
 				if (!FeedDataVideoFUA(pData, nalSize, 0, nalSize,
-						absoluteTimestamp )) { //+ (double) tsIncrement / 90000.00)) {
+						absoluteTimestamp)) { //+ (double) tsIncrement / 90000.00)) {
 					FATAL("Unable to feed data");
 					return false;
 				}
@@ -155,6 +182,8 @@ bool OutNetRTPUDPH264Stream::FeedDataVideo(uint8_t *pData, uint32_t dataLength,
 bool OutNetRTPUDPH264Stream::FeedDataAudio(uint8_t *pData, uint32_t dataLength,
 		uint32_t processedLength, uint32_t totalLength,
 		double absoluteTimestamp, bool isAudio) {
+	_audioBytesCount += dataLength;
+	_audioPacketsCount++;
 	return FeedDataAudioMPEG4Generic(pData, dataLength, processedLength, totalLength,
 			absoluteTimestamp);
 }
@@ -192,49 +221,49 @@ bool OutNetRTPUDPH264Stream::FeedDataVideoFUA(uint8_t *pData, uint32_t dataLengt
 	uint32_t chunkSize = 0;
 	while (sentAmount != dataLength) {
 		chunkSize = dataLength - sentAmount;
-		chunkSize = chunkSize < MAX_RTP_PACKET_SIZE ? chunkSize : MAX_RTP_PACKET_SIZE;
+		chunkSize = chunkSize < _maxRTPPacketSize ? chunkSize : _maxRTPPacketSize;
 
 		//1. Flags
 		if (processedLength + sentAmount + chunkSize == totalLength) {
-			((uint8_t *) _videoData.msg_iov[0].iov_base)[1] = 0xe1;
+			((uint8_t *) _videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE)[1] = 0xe1;
 		} else {
-			((uint8_t *) _videoData.msg_iov[0].iov_base)[1] = 0x61;
+			((uint8_t *) _videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE)[1] = 0x61;
 		}
 
 		//2. counter
-		EHTONSP(((uint8_t *) _videoData.msg_iov[0].iov_base) + 2, _videoCounter);
+		EHTONSP(((uint8_t *) _videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE) + 2, _videoCounter);
 		_videoCounter++;
 
 		//3. Timestamp
-		EHTONLP(((uint8_t *) _videoData.msg_iov[0].iov_base) + 4,
+		EHTONLP(((uint8_t *) _videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE) + 4,
 				BaseConnectivity::ToRTPTS(absoluteTimestamp, 90000));
 
 		if (chunkSize == totalLength) {
 			//4. No chunking
-			_videoData.msg_iov[0].iov_len = 12;
-			_videoData.msg_iov[1].iov_base = pData;
-			_videoData.msg_iov[1].iov_len = chunkSize;
+			_videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_LEN = 12;
+			_videoData.MSGHDR_MSG_IOV[1].IOVEC_IOV_BASE = (IOVEC_IOV_BASE_TYPE *)pData;
+			_videoData.MSGHDR_MSG_IOV[1].IOVEC_IOV_LEN = chunkSize;
 		} else {
 			//5. Chunking
-			_videoData.msg_iov[0].iov_len = 14;
+			_videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_LEN = 14;
 
 			if (processedLength + sentAmount == 0) {
 				//6. First chunk
-				((uint8_t *) _videoData.msg_iov[0].iov_base)[12] = (pData[0]&0xe0) | NALU_TYPE_FUA;
-				((uint8_t *) _videoData.msg_iov[0].iov_base)[13] = (pData[0]&0x1f) | 0x80;
-				_videoData.msg_iov[1].iov_base = pData + 1;
-				_videoData.msg_iov[1].iov_len = chunkSize - 1;
+				((uint8_t *) _videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE)[12] = (pData[0]&0xe0) | NALU_TYPE_FUA;
+				((uint8_t *) _videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE)[13] = (pData[0]&0x1f) | 0x80;
+				_videoData.MSGHDR_MSG_IOV[1].IOVEC_IOV_BASE = (IOVEC_IOV_BASE_TYPE *)(pData + 1);
+				_videoData.MSGHDR_MSG_IOV[1].IOVEC_IOV_LEN = chunkSize - 1;
 			} else {
 				if (processedLength + sentAmount + chunkSize == totalLength) {
 					//7. Last chunk
-					((uint8_t *) _videoData.msg_iov[0].iov_base)[13] &= 0x1f;
-					((uint8_t *) _videoData.msg_iov[0].iov_base)[13] |= 0x40;
+					((uint8_t *) _videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE)[13] &= 0x1f;
+					((uint8_t *) _videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE)[13] |= 0x40;
 				} else {
 					//8. Middle chunk
-					((uint8_t *) _videoData.msg_iov[0].iov_base)[13] &= 0x1f;
+					((uint8_t *) _videoData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE)[13] &= 0x1f;
 				}
-				_videoData.msg_iov[1].iov_base = pData;
-				_videoData.msg_iov[1].iov_len = chunkSize;
+				_videoData.MSGHDR_MSG_IOV[1].IOVEC_IOV_BASE = (IOVEC_IOV_BASE_TYPE *)pData;
+				_videoData.MSGHDR_MSG_IOV[1].IOVEC_IOV_LEN = chunkSize;
 			}
 		}
 
@@ -256,35 +285,35 @@ bool OutNetRTPUDPH264Stream::FeedDataAudioMPEG4Generic_aggregate(uint8_t *pData,
 	}
 
 	//2. Test if we need to send what we have so far
-	if (((14 + _audioData.msg_iov[1].iov_len + GETAVAILABLEBYTESCOUNT(_audioBuffer) + 2 + dataLength - 7) > MAX_RTP_PACKET_SIZE)
-			|| (_audioData.msg_iov[1].iov_len == 16)) {
+	if (((14 + _audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_LEN + GETAVAILABLEBYTESCOUNT(_audioBuffer) + 2 + dataLength - 7) > _maxRTPPacketSize)
+			|| (_audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_LEN == 16)) {
 		//3. counter
-		EHTONSP(((uint8_t *) _audioData.msg_iov[0].iov_base) + 2, _audioCounter);
+		EHTONSP(((uint8_t *) _audioData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE) + 2, _audioCounter);
 		_audioCounter++;
 
 		//4. Timestamp
-		EHTONLP(((uint8_t *) _audioData.msg_iov[0].iov_base) + 4,
+		EHTONLP(((uint8_t *) _audioData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE) + 4,
 				BaseConnectivity::ToRTPTS(absoluteTimestamp,
 				GetCapabilities()->aac._sampleRate));
 
 		//6. put the actual buffer
-		_audioData.msg_iov[2].iov_len = GETAVAILABLEBYTESCOUNT(_audioBuffer);
-		_audioData.msg_iov[2].iov_base = GETIBPOINTER(_audioBuffer);
+		_audioData.MSGHDR_MSG_IOV[2].IOVEC_IOV_LEN = GETAVAILABLEBYTESCOUNT(_audioBuffer);
+		_audioData.MSGHDR_MSG_IOV[2].IOVEC_IOV_BASE =(IOVEC_IOV_BASE_TYPE *) GETIBPOINTER(_audioBuffer);
 
-		EHTONSP(((uint8_t *) _audioData.msg_iov[0].iov_base) + 12,
-				_audioData.msg_iov[1].iov_len * 8);
+		EHTONSP(((uint8_t *) _audioData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE) + 12,
+				_audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_LEN * 8);
 
 		_pConnectivity->FeedAudioData(_audioData, absoluteTimestamp);
 
 		_audioBuffer.IgnoreAll();
-		_audioData.msg_iov[1].iov_len = 0;
+		_audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_LEN = 0;
 	}
 
 	//3. AU-Header
 	uint16_t auHeader = (uint16_t) ((dataLength - 7) << 3);
-	auHeader = auHeader | ((uint8_t) (_audioData.msg_iov[1].iov_len / 2));
-	EHTONSP(((uint8_t *) _audioData.msg_iov[1].iov_base) + _audioData.msg_iov[1].iov_len, auHeader);
-	_audioData.msg_iov[1].iov_len += 2;
+	auHeader = auHeader | ((uint8_t) (_audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_LEN / 2));
+	EHTONSP(((uint8_t *) _audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_BASE) + _audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_LEN, auHeader);
+	_audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_LEN += 2;
 
 
 	//4. Save the buffer
@@ -310,7 +339,7 @@ bool OutNetRTPUDPH264Stream::FeedDataAudioMPEG4Generic_one_by_one(uint8_t *pData
 		} else {
 			//4. This is not the first chunk. Test to see if this is
 			//the last chunk or not
-			if (totalLength < processedLength + dataLength) {
+			if (dataLength + processedLength < totalLength) {
 				//5. This is not the last chunk of the packet.
 				//Test and see if we have any previous data inside the buffer
 				//if we don't, that means we didn't catch the beginning
@@ -349,8 +378,11 @@ bool OutNetRTPUDPH264Stream::FeedDataAudioMPEG4Generic_one_by_one(uint8_t *pData
 		}
 	}
 
-	//3. Take care of the RTMP headers if necessary
-	if (_pInStream->GetType() == ST_IN_NET_RTMP) {
+	uint64_t inStreamType = _pInStream->GetType();
+
+	if ((inStreamType == ST_IN_NET_RTMP)
+			|| (inStreamType == ST_IN_NET_RTP)
+			|| (inStreamType == ST_IN_NET_LIVEFLV)) {
 		//2. Do we have enough data to read the RTMP header?
 		if (dataLength <= 2) {
 			WARN("Bogus AAC packet");
@@ -358,10 +390,14 @@ bool OutNetRTPUDPH264Stream::FeedDataAudioMPEG4Generic_one_by_one(uint8_t *pData
 			return true;
 		}
 
-		//3. Is this a RTMP codec setup? If so, ignore it
-		if (pData[1] != 1) {
-			_audioBuffer.IgnoreAll();
-			return true;
+		//3. Take care of the RTMP headers if necessary
+		if ((inStreamType == ST_IN_NET_RTMP)
+				|| (inStreamType == ST_IN_NET_LIVEFLV)) {
+			//3. Is this a RTMP codec setup? If so, ignore it
+			if (pData[1] != 1) {
+				_audioBuffer.IgnoreAll();
+				return true;
+			}
 		}
 
 		//4. Skip the RTMP header
@@ -403,23 +439,23 @@ bool OutNetRTPUDPH264Stream::FeedDataAudioMPEG4Generic_one_by_one(uint8_t *pData
 	 */
 
 	//5. counter
-	EHTONSP(((uint8_t *) _audioData.msg_iov[0].iov_base) + 2, _audioCounter);
+	EHTONSP(((uint8_t *) _audioData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE) + 2, _audioCounter);
 	_audioCounter++;
 
 	//6. Timestamp
-	EHTONLP(((uint8_t *) _audioData.msg_iov[0].iov_base) + 4,
+	EHTONLP(((uint8_t *) _audioData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE) + 4,
 			(uint32_t) (absoluteTimestamp
 			* (double) GetCapabilities()->aac._sampleRate / 1000.000));
 
-	EHTONSP(((uint8_t *) _audioData.msg_iov[0].iov_base) + 12, 16);
+	EHTONSP(((uint8_t *) _audioData.MSGHDR_MSG_IOV[0].IOVEC_IOV_BASE) + 12, 16);
 
 	uint16_t auHeader = (uint16_t) ((dataLength - adtsHeaderLength) << 3);
-	EHTONSP(((uint8_t *) _audioData.msg_iov[1].iov_base), auHeader);
-	_audioData.msg_iov[1].iov_len = 2;
+	EHTONSP(((uint8_t *) _audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_BASE), auHeader);
+	_audioData.MSGHDR_MSG_IOV[1].IOVEC_IOV_LEN = 2;
 
 	//7. put the actual buffer
-	_audioData.msg_iov[2].iov_len = dataLength - adtsHeaderLength;
-	_audioData.msg_iov[2].iov_base = pData + adtsHeaderLength;
+	_audioData.MSGHDR_MSG_IOV[2].IOVEC_IOV_LEN = dataLength - adtsHeaderLength;
+	_audioData.MSGHDR_MSG_IOV[2].IOVEC_IOV_BASE =(IOVEC_IOV_BASE_TYPE *)(pData + adtsHeaderLength);
 
 	if (!_pConnectivity->FeedAudioData(_audioData, absoluteTimestamp)) {
 		FATAL("Unable to feed data");

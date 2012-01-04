@@ -28,11 +28,11 @@
 #include "streaming/rtmpstream.h"
 
 #define RECEIVED_BYTES_COUNT_REPORT_CHUNK 131072
-#define MAX_CHANNELS_COUNT (64+256+256)
+#define MAX_CHANNELS_COUNT (64+255)
 #define MAX_STREAMS_COUNT 256
 
 #define MIN_AV_CHANNLES 20
-#define MAX_AV_CHANNLES 60
+#define MAX_AV_CHANNLES MAX_CHANNELS_COUNT
 
 typedef enum _RTMPState {
 	RTMP_STATE_NOT_INITIALIZED,
@@ -48,6 +48,9 @@ class BaseOutNetRTMPStream;
 class InFileRTMPStream;
 class InNetRTMPStream;
 class BaseRTMPAppProtocolHandler;
+#ifdef ENFORCE_RTMP_OUTPUT_CHECKS
+class MonitorRTMPProtocol;
+#endif  /* ENFORCE_RTMP_OUTPUT_CHECKS */
 
 class DLLEXP BaseRTMPProtocol
 : public BaseProtocol {
@@ -57,6 +60,10 @@ protected:
 	bool _handshakeCompleted;
 	RTMPState _rtmpState;
 	IOBuffer _outputBuffer;
+#ifdef ENFORCE_RTMP_OUTPUT_CHECKS
+	IOBuffer _intermediateBuffer;
+	MonitorRTMPProtocol *_pMonitor;
+#endif /* ENFORCE_RTMP_OUTPUT_CHECKS */
 	uint64_t _nextReceivedBytesCountReport;
 	uint32_t _winAckSize;
 	Channel _channels[MAX_CHANNELS_COUNT];
@@ -85,7 +92,9 @@ public:
 	virtual void ReadyForSend();
 	virtual void SetApplication(BaseClientApplication *pApplication);
 
-	virtual void GetStats(Variant &info);
+	virtual void GetStats(Variant &info, uint32_t namespaceId = 0);
+
+	bool ResetChannel(uint32_t channelId);
 
 	bool SendMessage(Variant &message);
 	bool SendRawData(Header &header, Channel &channel, uint8_t *pData, uint32_t length);

@@ -10,6 +10,7 @@ configuration=
 
 	-- this is the place where all the logging facilities are setted up
 	-- you can add/remove any number of locations
+
 	logAppenders=
 	{
 		{
@@ -30,7 +31,11 @@ configuration=
 			type="file",
 			level=6,
 			-- the file where the log messages are going to land
-			fileName="/tmp/crtmpserver.log"
+			fileName="/tmp/crtmpserver",
+			--newLineCharacters="\r\n",
+			fileHistorySize=10,
+			fileLength=1024*256,
+			singleLine=true
 		}
 	},
 	
@@ -104,6 +109,9 @@ configuration=
                         dbUser="Username",
                         dbPass="Password",
                         db="Db Name",
+
+			mediaFolder="/Volumes/android/backup/media/",
+
 			aliases=
 			{
 				"simpleLive",
@@ -115,11 +123,6 @@ configuration=
 			},
 			acceptors = 
 			{
-				{
-					ip="0.0.0.0",
-					port=1935,
-					protocol="inboundRtmfp"
-				},
 				{
 					ip="0.0.0.0",
 					port=6666,
@@ -154,52 +157,17 @@ configuration=
 					localStreamName="test_aaa",
 				},
 				{
-					uri="rtsp://0.0.0.0:2323/test.sdp",
-					localStreamName="stream-1-udp"
-				},
-				{
-					uri="rtsp://stream01.qt.slamtv.true.nl/slamtv.sdp",
-					localStreamName="stream0-udp"
-				},
-				{
-                    uri="rtsp://stream01.qt.slamtv.true.nl/slamtv.sdp",
-                    localStreamName="stream0-tcp",
-					forceTcp=true
-                },
-				{
-					uri="rtmp://10.0.1.15/vod/mp4:test_mp4",
-					localStreamName="stream1"
-				},
-				{
-                    uri="rtmp://10.0.1.15/vod/test_flv",
-                    localStreamName="stream2"
-                },
-				{
-					uri="rtsp://media-us-2.soundreach.net/slcn_lifestyle.sdp",
-					localStreamName="stream3",
+					uri="rtsp://fms20.mediadirect.ro/live2/realitatea/realitatea",
+					localStreamName="rtsp_test",
 					forceTcp=true
 				},
-				{
-					uri="rtsp://82.177.67.61/axis-media/media.amp",
-					localStreamName="stream4",
-					forceTcp=false
-				},
-				{
-					uri="http://v13.nonxt6.c.youtube.com/videoplayback?ip=0.0.0.0&sparams=id%2Cexpire%2Cip%2Cipbits%2Citag%2Calgorithm%2Cburst%2Cfactor%2Coc%3AU0dXSlFSVl9FSkNNN19JTFpF&algorithm=throttle-factor&itag=34&ipbits=0&burst=40&sver=3&expire=1285178400&key=yt1&signature=548764ECB414E3CA08BDD414F4B633853F9051AC.D8FFF913C9B3BF1C339BD1A60A77C5D1790775EE&factor=1.25&id=bcdad173a3ba8daa&redirect_counter=1",
-					localStreamName="stream5",
-				}
 				{
 					uri="rtmp://edge01.fms.dutchview.nl/botr/bunny",
-					localStreamName="stream6",
-					emulateUserAgent="MAC 10,1,82,76",
-				}
-				{
- 					uri="rtmp://edge01.fms.dutchview.nl/botr/bunny",
-					localStreamName="stream6",
+					localStreamName="rtmp_test",
 					swfUrl="http://www.example.com/example.swf";
 					pageUrl="http://www.example.com/";
 					emulateUserAgent="MAC 10,1,82,76",
- 				}]]--
+				}]]--
 			},
 			validateHandshake=true,
 			keyframeSeek=true,
@@ -207,17 +175,22 @@ configuration=
 			clientSideBuffer=12, --in seconds, between 5 and 30
 			--generateMetaFiles=true, --this will generate seek/meta files on application startup
 			--renameBadFiles=false,
-			--[[authentication=
+			--enableCheckBandwidth=true,
+			authentication=
 			{
-				type="adobe",
-				encoderAgents=
-				{
-					"FMLE/3.0 (compatible; FMSc/1.0)",
-					"my 3rd party encoder",
-					"some other encoder",
+				rtmp={
+					type="adobe",
+					encoderAgents=
+					{
+						"FMLE/3.0 (compatible; FMSc/1.0)",
+						"My user agent",
+					},
+					usersFile="users.lua"
 				},
-				usersFile="users.lua",
-			}]]--
+				rtsp={
+					usersFile="users.lua"
+				}
+			},
 		},
 		{
 			name="samplefactory",
@@ -308,23 +281,21 @@ configuration=
 					emulateUserAgent="FMLE/3.0 (compatible; FMSc/1.0 http://www.rtmpd.com)"
 				}]]--,
 				{
-					targetUri="rtmp://localhost/vod",
+					targetUri="rtmp://gigi:spaima@localhost/vod",
 					targetStreamType="live", -- (live, record or append)
 					emulateUserAgent="My user agent",
-					localStreamName="stream1"
+					localStreamName="stream1",
+					keepAlive=true
 				},
 			},
 			--[[externalStreams = 
 			{
 				{
-					uri="rtsp://82.177.67.61/axis-media/media.amp",
-					localStreamName="stream4",
-					forceTcp=false
-                },
-				{
-					uri="rtmp://edge01.fms.dutchview.nl/botr/bunny",
-					localStreamName="stream1"
-                },
+					uri="rtsp://fms20.mediadirect.ro/live2/realitatea/realitatea",
+					localStreamName="stream1",
+					forceTcp=true,
+					keepAlive=true
+				},
 			},]]--
 			--validateHandshake=true,
 			--default=true,

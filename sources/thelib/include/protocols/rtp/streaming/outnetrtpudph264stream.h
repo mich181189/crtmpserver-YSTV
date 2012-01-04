@@ -26,20 +26,30 @@
 class DLLEXP OutNetRTPUDPH264Stream
 : public BaseOutNetRTPUDPStream {
 private:
+	bool _forceTcp;
 	IOBuffer _videoBuffer;
-	msghdr _videoData;
+	MSGHDR _videoData;
 	uint8_t *_pSPS;
 	uint32_t _SPSLen;
 	uint8_t *_pPPS;
 	uint32_t _PPSLen;
 
-	uint8_t _audioPacketsCount;
 	IOBuffer _audioBuffer;
-	msghdr _audioData;
+	MSGHDR _audioData;
+
+	uint64_t _audioPacketsCount;
+	uint64_t _audioDroppedPacketsCount;
+	uint64_t _audioBytesCount;
+	uint64_t _videoPacketsCount;
+	uint64_t _videoDroppedPacketsCount;
+	uint64_t _videoBytesCount;
+	uint32_t _maxRTPPacketSize;
 public:
 	OutNetRTPUDPH264Stream(BaseProtocol *pProtocol,
-			StreamsManager *pStreamsManager, string name);
+			StreamsManager *pStreamsManager, string name, bool forceTcp);
 	virtual ~OutNetRTPUDPH264Stream();
+
+	virtual void GetStats(Variant &info, uint32_t namespaceId = 0);
 
 	virtual bool FeedDataVideo(uint8_t *pData, uint32_t dataLength,
 			uint32_t processedLength, uint32_t totalLength,

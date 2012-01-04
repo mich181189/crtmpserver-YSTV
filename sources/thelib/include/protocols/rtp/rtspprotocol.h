@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -33,6 +33,8 @@ class InboundRTPProtocol;
 class InNetRTPStream;
 class OutboundConnectivity;
 class InboundConnectivity;
+class BaseOutStream;
+struct RTPClient;
 
 class DLLEXP RTSPProtocol
 : public BaseProtocol {
@@ -65,12 +67,20 @@ protected:
 	Variant _requestHeaders;
 	string _requestContent;
 	uint32_t _requestSequence;
+	map<uint32_t, Variant> _pendingRequestHeaders;
+	map<uint32_t, string> _pendingRequestContent;
 
 	OutboundConnectivity *_pOutboundConnectivity;
 	InboundConnectivity *_pInboundConnectivity;
-	string _basicAuthentication;
+
+	Variant _authentication;
 
 	uint32_t _keepAliveTimerId;
+	BaseOutStream *_pOutStream;
+
+	string _keepAliveURI;
+
+	string _sessionId;
 public:
 	RTSPProtocol();
 	virtual ~RTSPProtocol();
@@ -82,23 +92,27 @@ public:
 	virtual bool AllowNearProtocol(uint64_t type);
 	virtual bool SignalInputData(int32_t recvAmount);
 	virtual bool SignalInputData(IOBuffer &buffer);
-	virtual void GetStats(Variant &info);
+	virtual void GetStats(Variant &info, uint32_t namespaceId = 0);
 
-	void SetBasicAuthentication(string userName, string password);
-	bool EnableKeepAlive(uint32_t period);
+	string GetSessionId();
+	string GenerateSessionId();
+	bool SetSessionId(string sessionId);
+
+	bool SetAuthentication(string wwwAuthenticateHeader, string userName,
+			string password);
+	bool EnableKeepAlive(uint32_t period, string keepAliveURI);
 	bool SendKeepAliveOptions();
-	bool HasInboundConnectivity();
+	bool HasConnectivity();
 
 	SDP &GetInboundSDP();
 
-	void ClearRequestMessage();
+	//void ClearRequestMessage();
 	void PushRequestFirstLine(string method, string url, string version);
 	void PushRequestHeader(string name, string value);
 	void PushRequestContent(string outboundContent, bool append);
 	bool SendRequestMessage();
 	uint32_t LastRequestSequence();
-	Variant &GetRequestHeaders();
-	string &GetRequestContent();
+	bool GetRequest(uint32_t seqId, Variant &result, string &content);
 
 	void ClearResponseMessage();
 	void PushResponseFirstLine(string version, uint32_t code, string reason);
@@ -106,17 +120,23 @@ public:
 	void PushResponseContent(string outboundContent, bool append);
 	bool SendResponseMessage();
 
-	OutboundConnectivity * GetOutboundConnectivity(BaseInNetStream *pInNetStream);
+	OutboundConnectivity * GetOutboundConnectivity(BaseInNetStream *pInNetStream,
+			bool forceTcp);
 	void CloseOutboundConnectivity();
 
-	InboundConnectivity *GetInboundConnectivity(Variant &videoTrack,
-			Variant &audioTrack, string sdpStreamName);
+	InboundConnectivity *GetInboundConnectivity(string sdpStreamName,
+			uint32_t bandwidthHint, uint8_t rtcpDetectionInterval);
+	InboundConnectivity *GetInboundConnectivity();
+	//	InboundConnectivity *GetInboundConnectivity1(Variant &videoTrack,
+	//			Variant &audioTrack, string sdpStreamName, uint32_t bandwidthHint);
+
 	void CloseInboundConnectivity();
 
-	string GetTransportHeaderLine(bool isAudio);
-
 	bool SendRaw(uint8_t *pBuffer, uint32_t length);
+	bool SendRaw(MSGHDR *pMessage, uint16_t length, RTPClient *pClient,
+			bool isAudio, bool isData);
 
+	void SetOutStream(BaseOutStream *pOutStream);
 private:
 	bool SendMessage(Variant &headers, string &content);
 	bool ParseHeaders(IOBuffer &buffer);

@@ -20,7 +20,6 @@
 #include "flvplaybackapplication.h"
 #include "protocols/protocoltypes.h"
 #include "protocols/rtmp/basertmpprotocol.h"
-#include "rtmfpappprotocolhandler.h"
 #include "rtmpappprotocolhandler.h"
 #include "liveflvappprotocolhandler.h"
 #include "tsappprotocolhandler.h"
@@ -30,6 +29,7 @@
 #include "application/clientapplicationmanager.h"
 #include "mmsappprotocolhandler.h"
 #include "rawhttpstreamappprotocolhandler.h"
+#include "httpappprotocolhandler.h"
 using namespace app_flvplayback;
 
 FLVPlaybackApplication::FLVPlaybackApplication(Variant &configuration)
@@ -37,9 +37,6 @@ FLVPlaybackApplication::FLVPlaybackApplication(Variant &configuration)
 #ifdef HAS_PROTOCOL_RTMP
 	_pRTMPHandler = NULL;
 #endif /* HAS_PROTOCOL_RTMP */
-#ifdef HAS_PROTOCOL_RTMFP
-	_pRTMFPHandler = NULL;
-#endif /* HAS_PROTOCOL_RTMFP */
 #ifdef HAS_PROTOCOL_LIVEFLV
 	_pLiveFLVHandler = NULL;
 #endif /* HAS_PROTOCOL_LIVEFLV */
@@ -56,6 +53,9 @@ FLVPlaybackApplication::FLVPlaybackApplication(Variant &configuration)
 #ifdef HAS_PROTOCOL_RAWHTTPSTREAM
 	_pRawHTTPStreamHandler = NULL;
 #endif /* HAS_PROTOCOL_RAWHTTPSTREAM */
+#ifdef HAS_PROTOCOL_HTTP
+	_pHTTPHandler = NULL;
+#endif /* HAS_PROTOCOL_HTTP */
 }
 
 FLVPlaybackApplication::~FLVPlaybackApplication() {
@@ -67,13 +67,6 @@ FLVPlaybackApplication::~FLVPlaybackApplication() {
 		_pRTMPHandler = NULL;
 	}
 #endif /* HAS_PROTOCOL_RTMP */
-#ifdef HAS_PROTOCOL_RTMFP
-	UnRegisterAppProtocolHandler(PT_INBOUND_RTMFP);
-	if (_pRTMFPHandler != NULL) {
-		delete _pRTMFPHandler;
-		_pRTMFPHandler = NULL;
-	}
-#endif /* HAS_PROTOCOL_RTMFP */
 #ifdef HAS_PROTOCOL_LIVEFLV
 	UnRegisterAppProtocolHandler(PT_INBOUND_LIVE_FLV);
 	if (_pLiveFLVHandler != NULL) {
@@ -117,19 +110,27 @@ FLVPlaybackApplication::~FLVPlaybackApplication() {
 		_pRawHTTPStreamHandler = NULL;
 	}
 #endif /* HAS_PROTOCOL_RAWHTTPSTREAM */
+#ifdef HAS_PROTOCOL_HTTP
+	UnRegisterAppProtocolHandler(PT_INBOUND_HTTP);
+	UnRegisterAppProtocolHandler(PT_OUTBOUND_HTTP);
+	if (_pHTTPHandler != NULL) {
+		delete _pHTTPHandler;
+		_pHTTPHandler = NULL;
+	}
+#endif /* HAS_PROTOCOL_HTTP */
 }
 
 bool FLVPlaybackApplication::Initialize() {
+	if (!BaseClientApplication::Initialize()) {
+		FATAL("Unable to initialize application");
+		return false;
+	}
 #ifdef HAS_PROTOCOL_RTMP
 	_pRTMPHandler = new RTMPAppProtocolHandler(_configuration);
 	RegisterAppProtocolHandler(PT_INBOUND_RTMP, _pRTMPHandler);
 	RegisterAppProtocolHandler(PT_INBOUND_RTMPS_DISC, _pRTMPHandler);
 	RegisterAppProtocolHandler(PT_OUTBOUND_RTMP, _pRTMPHandler);
 #endif /* HAS_PROTOCOL_RTMP */
-#ifdef HAS_PROTOCOL_RTMFP
-	_pRTMFPHandler = new RTMFPAppProtocolHandler(_configuration);
-	RegisterAppProtocolHandler(PT_INBOUND_RTMFP, _pRTMFPHandler);
-#endif /* HAS_PROTOCOL_RTMFP */
 #ifdef HAS_PROTOCOL_LIVEFLV
 	_pLiveFLVHandler = new LiveFLVAppProtocolHandler(_configuration);
 	RegisterAppProtocolHandler(PT_INBOUND_LIVE_FLV, _pLiveFLVHandler);
@@ -156,6 +157,11 @@ bool FLVPlaybackApplication::Initialize() {
 	_pRawHTTPStreamHandler = new RawHTTPStreamAppProtocolHandler(_configuration);
 	RegisterAppProtocolHandler(PT_INBOUND_RAW_HTTP_STREAM, _pRawHTTPStreamHandler);
 #endif /* HAS_PROTOCOL_RAWHTTPSTREAM */
+#ifdef HAS_PROTOCOL_HTTP
+	_pHTTPHandler = new HTTPAppProtocolHandler(_configuration);
+	RegisterAppProtocolHandler(PT_INBOUND_HTTP_FOR_RTMP, _pHTTPHandler);
+	RegisterAppProtocolHandler(PT_OUTBOUND_HTTP_FOR_RTMP, _pHTTPHandler);
+#endif /* HAS_PROTOCOL_HTTP */
 
 	return PullExternalStreams();
 }

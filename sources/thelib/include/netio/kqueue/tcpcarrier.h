@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -36,13 +36,14 @@ private:
 	uint16_t _nearPort;
 	uint64_t _rx;
 	uint64_t _tx;
+	int32_t _ioAmount;
 public:
 	TCPCarrier(int32_t fd);
 	virtual ~TCPCarrier();
 	virtual bool OnEvent(struct kevent &event);
 	virtual bool SignalOutputData();
 	virtual operator string();
-	virtual void GetStats(Variant &info);
+	virtual void GetStats(Variant &info, uint32_t namespaceId = 0);
 
 	sockaddr_in &GetFarEndpointAddress();
 	string GetFarEndpointAddressIp();

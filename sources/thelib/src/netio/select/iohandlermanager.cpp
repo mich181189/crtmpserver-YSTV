@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -36,6 +36,7 @@ struct timeval IOHandlerManager::_timeout = {1, 0};
 TimersManager *IOHandlerManager::_pTimersManager = NULL;
 select_event IOHandlerManager::_currentEvent = {0};
 bool IOHandlerManager::_isShuttingDown = false;
+FdStats IOHandlerManager::_fdStats;
 
 map<uint32_t, IOHandler *> & IOHandlerManager::GetActiveHandlers() {
 	return _activeIOHandlers;
@@ -45,11 +46,19 @@ map<uint32_t, IOHandler *> & IOHandlerManager::GetDeadHandlers() {
 	return _deadIOHandlers;
 }
 
+FdStats &IOHandlerManager::GetStats() {
+	return _fdStats;
+}
+
 void IOHandlerManager::Initialize() {
+	_fdStats.Reset();
 	FD_ZERO(&_readFds);
 	FD_ZERO(&_writeFds);
 	_pTimersManager = new TimersManager(ProcessTimer);
 	_isShuttingDown = false;
+}
+
+void IOHandlerManager::Start() {
 }
 
 void IOHandlerManager::SignalShutdown() {
@@ -80,6 +89,7 @@ void IOHandlerManager::RegisterIOHandler(IOHandler* pIOHandler) {
 	}
 	size_t before = _activeIOHandlers.size();
 	_activeIOHandlers[pIOHandler->GetId()] = pIOHandler;
+	_fdStats.RegisterManaged(pIOHandler->GetType());
 	DEBUG("Handlers count changed: %"PRIz"u->%"PRIz"u %s", before, before + 1,
 			STR(IOHandler::IOHTToString(pIOHandler->GetType())));
 }
@@ -90,12 +100,50 @@ void IOHandlerManager::UnRegisterIOHandler(IOHandler *pIOHandler) {
 	DisableWriteData(pIOHandler);
 	DisableTimer(pIOHandler);
 	if (MAP_HAS1(_activeIOHandlers, pIOHandler->GetId())) {
+		_fdStats.UnRegisterManaged(pIOHandler->GetType());
 		size_t before = _activeIOHandlers.size();
 		_activeIOHandlers.erase(pIOHandler->GetId());
 		DEBUG("Handlers count changed: %"PRIz"u->%"PRIz"u %s", before, before - 1,
 				STR(IOHandler::IOHTToString(pIOHandler->GetType())));
 	}
 }
+
+int IOHandlerManager::CreateRawUDPSocket() {
+	int result = socket(AF_INET, SOCK_DGRAM, 0);
+	if (result >= 0) {
+		_fdStats.RegisterRawUdp();
+	} else {
+		uint32_t err = LASTSOCKETERROR;
+		FATAL("Unable to create raw udp socket. Error code was: %"PRIu32, err);
+	}
+	return result;
+}
+
+void IOHandlerManager::CloseRawUDPSocket(int socket) {
+	if (socket > 0) {
+		_fdStats.UnRegisterRawUdp();
+	}
+	CLOSE_SOCKET(socket);
+}
+
+#ifdef GLOBALLY_ACCOUNT_BYTES
+
+void IOHandlerManager::AddInBytesManaged(IOHandlerType type, uint64_t bytes) {
+	_fdStats.AddInBytesManaged(type, bytes);
+}
+
+void IOHandlerManager::AddOutBytesManaged(IOHandlerType type, uint64_t bytes) {
+	_fdStats.AddOutBytesManaged(type, bytes);
+}
+
+void IOHandlerManager::AddInBytesRawUdp(uint64_t bytes) {
+	_fdStats.AddInBytesRawUdp(bytes);
+}
+
+void IOHandlerManager::AddOutBytesRawUdp(uint64_t bytes) {
+	_fdStats.AddOutBytesRawUdp(bytes);
+}
+#endif /* GLOBALLY_ACCOUNT_BYTES */
 
 bool IOHandlerManager::EnableReadData(IOHandler *pIOHandler) {
 	_fdState[pIOHandler->GetInboundFd()][pIOHandler->GetId()] |= FDSTATE_READ_ENABLED;

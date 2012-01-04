@@ -27,12 +27,14 @@
 
 BaseOutNetRTPUDPStream::BaseOutNetRTPUDPStream(BaseProtocol *pProtocol,
 		StreamsManager *pStreamsManager, string name)
-: BaseOutNetStream(NULL /*FIXME pProtocol*/, pStreamsManager, ST_OUT_NET_RTP, name) {
+: BaseOutNetStream(pProtocol, pStreamsManager, ST_OUT_NET_RTP, name) {
 	_audioSsrc = 0x80000000 | (rand()&0x00ffffff);
 	_videoSsrc = _audioSsrc + 1;
 	_pConnectivity = NULL;
 	_videoCounter = rand();
 	_audioCounter = rand();
+	_hasAudio = false;
+	_hasVideo = false;
 }
 
 BaseOutNetRTPUDPStream::~BaseOutNetRTPUDPStream() {
@@ -90,7 +92,9 @@ bool BaseOutNetRTPUDPStream::SignalStop() {
 bool BaseOutNetRTPUDPStream::IsCompatibleWithType(uint64_t type) {
 	return type == ST_IN_NET_RTMP
 			|| type == ST_IN_NET_TS
-			|| type == ST_IN_NET_AAC;
+			|| type == ST_IN_NET_AAC
+			|| type == ST_IN_NET_RTP
+			|| type == ST_IN_NET_LIVEFLV;
 }
 
 void BaseOutNetRTPUDPStream::SignalDetachedFromInStream() {

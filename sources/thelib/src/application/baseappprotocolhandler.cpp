@@ -29,6 +29,10 @@ BaseAppProtocolHandler::BaseAppProtocolHandler(Variant &configuration) {
 BaseAppProtocolHandler::~BaseAppProtocolHandler() {
 }
 
+bool BaseAppProtocolHandler::ParseAuthenticationNode(Variant &node, Variant &result) {
+	return false;
+}
+
 void BaseAppProtocolHandler::SetApplication(BaseClientApplication *pApplication) {
 	_pApplication = pApplication;
 }
@@ -45,13 +49,13 @@ BaseAppProtocolHandler * BaseAppProtocolHandler::GetProtocolHandler(uint64_t pro
 
 bool BaseAppProtocolHandler::PullExternalStream(URI uri, Variant streamConfig) {
 	WARN("Pulling in streams for scheme %s in application %s not yet implemented. Stream configuration was:\n%s",
-			STR(uri.scheme),
+			STR(uri.scheme()),
 			STR(GetApplication()->GetName()),
 			STR(streamConfig.ToString()));
 	return false;
 }
 
-bool BaseAppProtocolHandler::PushLocalStream(BaseInStream *pInStream, Variant streamConfig) {
+bool BaseAppProtocolHandler::PushLocalStream(Variant streamConfig) {
 	WARN("Pushing out streams for this protocol handler in application %s not yet implemented.",
 			STR(GetApplication()->GetName()));
 	return false;

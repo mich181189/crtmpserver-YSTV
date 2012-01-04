@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -26,13 +26,13 @@
 
 UDPCarrier::UDPCarrier(int32_t fd)
 : IOHandler(fd, fd, IOHT_UDP_CARRIER) {
-	IOHandlerManager::EnableReadData(this);
 	memset(&_peerAddress, 0, sizeof (sockaddr_in));
 	memset(&_nearAddress, 0, sizeof (sockaddr_in));
 	_nearIp = "";
 	_nearPort = 0;
-	_rx=0;
-	_tx=0;
+	_rx = 0;
+	_tx = 0;
+	_ioAmount = 0;
 }
 
 UDPCarrier::~UDPCarrier() {
@@ -40,20 +40,19 @@ UDPCarrier::~UDPCarrier() {
 }
 
 bool UDPCarrier::OnEvent(select_event &event) {
-	int32_t recvAmount = 0;
-
 	//3. Do the I/O
 	switch (event.type) {
 		case SET_READ:
 		{
 			IOBuffer *pInputBuffer = _pProtocol->GetInputBuffer();
 			assert(pInputBuffer != NULL);
-			if (!pInputBuffer->ReadFromUDPFd(_inboundFd, recvAmount, _peerAddress)) {
+			if (!pInputBuffer->ReadFromUDPFd(_inboundFd, _ioAmount, _peerAddress)) {
 				FATAL("Unable to read data");
 				return false;
 			}
-			_rx += recvAmount;
-			return _pProtocol->SignalInputData(recvAmount, &_peerAddress);
+			_rx += _ioAmount;
+			ADD_IN_BYTES_MANAGED(_type, _ioAmount);
+			return _pProtocol->SignalInputData(_ioAmount, &_peerAddress);
 		}
 		case SET_WRITE:
 		{
@@ -77,7 +76,7 @@ UDPCarrier::operator string() {
 	return format("UDP(%d)", _inboundFd);
 }
 
-void UDPCarrier::GetStats(Variant &info) {
+void UDPCarrier::GetStats(Variant &info, uint32_t namespaceId) {
 	if (!GetEndpointsInfo()) {
 		FATAL("Unable to get endpoints info");
 		info = "unable to get endpoints info";
@@ -87,6 +86,18 @@ void UDPCarrier::GetStats(Variant &info) {
 	info["nearIP"] = _nearIp;
 	info["nearPort"] = _nearPort;
 	info["rx"] = _rx;
+}
+
+Variant &UDPCarrier::GetParameters() {
+	return _parameters;
+}
+
+void UDPCarrier::SetParameters(Variant parameters) {
+	_parameters = parameters;
+}
+
+bool UDPCarrier::StartAccept() {
+	return IOHandlerManager::EnableReadData(this);
 }
 
 string UDPCarrier::GetFarEndpointAddress() {
@@ -113,7 +124,8 @@ uint16_t UDPCarrier::GetNearEndpointPort() {
 	return _nearPort;
 }
 
-UDPCarrier* UDPCarrier::Create(string bindIp, uint16_t bindPort) {
+UDPCarrier* UDPCarrier::Create(string bindIp, uint16_t bindPort,
+		uint16_t ttl, uint16_t tos) {
 
 	//1. Create the socket
 	int sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -123,11 +135,19 @@ UDPCarrier* UDPCarrier::Create(string bindIp, uint16_t bindPort) {
 		return NULL;
 	}
 
-	//2. No SIGPIPE
-	if (!setFdNoSIGPIPE(sock)) {
-		FATAL("Unable to set SO_NOSIGPIPE");
+	//2. fd options
+	if (!setFdOptions(sock)) {
+		FATAL("Unable to set fd options");
 		CLOSE_SOCKET(sock);
 		return NULL;
+	}
+
+	if (tos <= 255) {
+		if (!setFdTOS(sock, (uint8_t) tos)) {
+			FATAL("Unable to set tos");
+			CLOSE_SOCKET(sock);
+			return NULL;
+		}
 	}
 
 	//3. bind if necessary
@@ -142,12 +162,41 @@ UDPCarrier* UDPCarrier::Create(string bindIp, uint16_t bindPort) {
 			CLOSE_SOCKET(sock);
 			return NULL;
 		}
+		uint32_t testVal = EHTONL(bindAddress.sin_addr.s_addr);
+		if ((testVal > 0xe0000000) && (testVal < 0xefffffff)) {
+			INFO("Subscribe to multicast %s:%"PRIu16, STR(bindIp), bindPort);
+			if (ttl <= 255) {
+				if (!setFdMulticastTTL(sock, (uint8_t) ttl)) {
+					FATAL("Unable to set ttl");
+					CLOSE_SOCKET(sock);
+					return NULL;
+				}
+			}
+		} else {
+			if (ttl <= 255) {
+				if (!setFdTTL(sock, (uint8_t) ttl)) {
+					FATAL("Unable to set ttl");
+					CLOSE_SOCKET(sock);
+					return NULL;
+				}
+			}
+		}
 		if (bind(sock, (sockaddr *) & bindAddress, sizeof (sockaddr)) != 0) {
-			int error = LASTSOCKETERROR;
-			FATAL("Unable to bind on address: udp://%s:%hu; Error was: %s (%d)",
+			int error = errno;
+			FATAL("Unable to bind on address: udp://%s:%"PRIu16"; Error was: %s (%"PRId32")",
 					STR(bindIp), bindPort, strerror(error), error);
 			CLOSE_SOCKET(sock);
 			return NULL;
+		}
+		if ((testVal > 0xe0000000) && (testVal < 0xefffffff)) {
+			struct ip_mreq group;
+			group.imr_multiaddr.s_addr = inet_addr(bindIp.c_str());
+			group.imr_interface.s_addr = INADDR_ANY;
+			if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *) &group, sizeof (group)) < 0) {
+				FATAL("Adding multicast group error");
+				CLOSE_SOCKET(sock);
+				return NULL;
+			}
 		}
 	}
 
@@ -158,13 +207,14 @@ UDPCarrier* UDPCarrier::Create(string bindIp, uint16_t bindPort) {
 	return pResult;
 }
 
-UDPCarrier* UDPCarrier::Create(string bindIp, uint16_t bindPort, BaseProtocol *pProtocol) {
+UDPCarrier* UDPCarrier::Create(string bindIp, uint16_t bindPort,
+		BaseProtocol *pProtocol, uint16_t ttl, uint16_t tos) {
 	if (pProtocol == NULL) {
 		FATAL("Protocol can't be null");
 		return NULL;
 	}
 
-	UDPCarrier *pResult = Create(bindIp, bindPort);
+	UDPCarrier *pResult = Create(bindIp, bindPort, ttl, tos);
 	if (pResult == NULL) {
 		FATAL("Unable to create UDP carrier");
 		return NULL;

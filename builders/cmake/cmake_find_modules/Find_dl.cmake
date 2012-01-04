@@ -9,6 +9,8 @@ FIND_PATH(DL_INCLUDE_PATH
 		/opt/local/include
 		NO_DEFAULT_PATH)
 
+SET(CMAKE_FIND_LIBRARY_SUFFIXES .so.2 ${CMAKE_FIND_LIBRARY_SUFFIXES})
+
 FIND_LIBRARY(DL_LIBRARY_PATH
 	NAMES
 		dl
@@ -19,7 +21,10 @@ FIND_LIBRARY(DL_LIBRARY_PATH
 		/usr/local/lib
 		/sw/lib
 		/opt/local/lib
+		/lib/i386-linux-gnu/
 		NO_DEFAULT_PATH)
+
+MESSAGE("DL_LIBRARY_PATH: ${DL_LIBRARY_PATH}")
 
 IF(DL_INCLUDE_PATH)
 	SET(DL_FOUND 1 CACHE STRING "Set to 1 if dl is found, 0 otherwise")

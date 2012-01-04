@@ -34,14 +34,20 @@ BaseClientApplication::BaseClientApplication(Variant &configuration)
 	_id = ++_idGenerator;
 	_configuration = configuration;
 	_name = (string) configuration[CONF_APPLICATION_NAME];
-	if ((VariantType) configuration[CONF_APPLICATION_ALIASES] != V_NULL) {
+	if (configuration.HasKeyChain(V_MAP, false, 1, CONF_APPLICATION_ALIASES)) {
 
 		FOR_MAP((configuration[CONF_APPLICATION_ALIASES]), string, Variant, i) {
 			ADD_VECTOR_END(_aliases, MAP_VAL(i));
 		}
 	}
-	_isDefault = (VariantType) configuration[CONF_APPLICATION_DEFAULT] != V_NULL ?
-			(bool)configuration[CONF_APPLICATION_DEFAULT] : false;
+	_isDefault = false;
+	if (configuration.HasKeyChain(V_BOOL, false, 1, CONF_APPLICATION_DEFAULT))
+		_isDefault = (bool)configuration[CONF_APPLICATION_DEFAULT];
+	_allowDuplicateInboundNetworkStreams = false;
+	if (configuration.HasKeyChain(V_BOOL, false, 1,
+			CONF_APPLICATION_ALLOW_DUPLICATE_INBOUND_NETWORK_STREAMS))
+		_allowDuplicateInboundNetworkStreams =
+			(bool)configuration[CONF_APPLICATION_ALLOW_DUPLICATE_INBOUND_NETWORK_STREAMS];
 }
 
 BaseClientApplication::~BaseClientApplication() {
@@ -76,6 +82,52 @@ bool BaseClientApplication::Initialize() {
 	return true;
 }
 
+bool BaseClientApplication::ActivateAcceptors(vector<IOHandler *> &acceptors) {
+	for (uint32_t i = 0; i < acceptors.size(); i++) {
+		if (!ActivateAcceptor(acceptors[i])) {
+			FATAL("Unable to activate acceptor");
+			return false;
+		}
+	}
+	return true;
+}
+
+bool BaseClientApplication::ActivateAcceptor(IOHandler *pIOHandler) {
+	switch (pIOHandler->GetType()) {
+		case IOHT_ACCEPTOR:
+		{
+			TCPAcceptor *pAcceptor = (TCPAcceptor *) pIOHandler;
+			pAcceptor->SetApplication(this);
+			return pAcceptor->StartAccept();
+		}
+		case IOHT_UDP_CARRIER:
+		{
+			UDPCarrier *pUDPCarrier = (UDPCarrier *) pIOHandler;
+			pUDPCarrier->GetProtocol()->GetNearEndpoint()->SetApplication(this);
+			return pUDPCarrier->StartAccept();
+		}
+		default:
+		{
+			FATAL("Invalid acceptor type");
+			return false;
+		}
+	}
+}
+
+string BaseClientApplication::GetServicesInfo() {
+	map<uint32_t, IOHandler *> handlers = IOHandlerManager::GetActiveHandlers();
+	string result = "";
+
+	FOR_MAP(handlers, uint32_t, IOHandler *, i) {
+		result += GetServiceInfo(MAP_VAL(i));
+	}
+	return result;
+}
+
+bool BaseClientApplication::AcceptTCPConnection(TCPAcceptor *pTCPAcceptor) {
+	return pTCPAcceptor->Accept();
+}
+
 void BaseClientApplication::RegisterAppProtocolHandler(uint64_t protocolType,
 		BaseAppProtocolHandler *pAppProtocolHandler) {
 	if (MAP_HAS1(_protocolsHandlers, protocolType))
@@ -88,6 +140,17 @@ void BaseClientApplication::UnRegisterAppProtocolHandler(uint64_t protocolType) 
 	if (MAP_HAS1(_protocolsHandlers, protocolType))
 		_protocolsHandlers[protocolType]->SetApplication(NULL);
 	_protocolsHandlers.erase(protocolType);
+}
+
+bool BaseClientApplication::GetAllowDuplicateInboundNetworkStreams() {
+	return _allowDuplicateInboundNetworkStreams;
+}
+
+bool BaseClientApplication::StreamNameAvailable(string streamName,
+		BaseProtocol *pProtocol) {
+	if (_allowDuplicateInboundNetworkStreams)
+		return true;
+	return _streamsManager.StreamNameAvailable(streamName);
 }
 
 BaseAppProtocolHandler *BaseClientApplication::GetProtocolHandler(BaseProtocol *pProtocol) {
@@ -154,19 +217,25 @@ void BaseClientApplication::UnRegisterProtocol(BaseProtocol *pProtocol) {
 }
 
 void BaseClientApplication::SignalStreamRegistered(BaseStream *pStream) {
-	INFO("Stream %u of type %s with name `%s` registered to application `%s`",
-			pStream->GetUniqueId(),
+	INFO("Stream %s(%"PRIu32") with name `%s` registered to application `%s` from protocol %s(%"PRIu32")",
 			STR(tagToString(pStream->GetType())),
+			pStream->GetUniqueId(),
 			STR(pStream->GetName()),
-			STR(_name));
+			STR(_name),
+			(pStream->GetProtocol() != NULL) ? STR(tagToString(pStream->GetProtocol()->GetType())) : "",
+			(pStream->GetProtocol() != NULL) ? pStream->GetProtocol()->GetId() : (uint32_t) 0
+			);
 }
 
 void BaseClientApplication::SignalStreamUnRegistered(BaseStream *pStream) {
-	INFO("Stream %u of type %s with name `%s` unregistered from application `%s`",
-			pStream->GetUniqueId(),
+	INFO("Stream %s(%"PRIu32") with name `%s` unregistered from application `%s` from protocol %s(%"PRIu32")",
 			STR(tagToString(pStream->GetType())),
+			pStream->GetUniqueId(),
 			STR(pStream->GetName()),
-			STR(_name));
+			STR(_name),
+			(pStream->GetProtocol() != NULL) ? STR(tagToString(pStream->GetProtocol()->GetType())) : "",
+			(pStream->GetProtocol() != NULL) ? pStream->GetProtocol()->GetId() : (uint32_t) 0
+			);
 }
 
 bool BaseClientApplication::PullExternalStreams() {
@@ -180,15 +249,34 @@ bool BaseClientApplication::PullExternalStreams() {
 		return false;
 	}
 
-	//2. Loop over the stream definitions and spawn the streams
+	//2. Loop over the stream definitions and validate duplicated stream names
+	Variant streamConfigs;
+	streamConfigs.IsArray(false);
 
 	FOR_MAP(_configuration["externalStreams"], string, Variant, i) {
-		Variant &streamConfig = MAP_VAL(i);
-		if (streamConfig != V_MAP) {
-			WARN("External stream configuration is invalid:\n%s",
-					STR(streamConfig.ToString()));
+		Variant &temp = MAP_VAL(i);
+		if ((!temp.HasKeyChain(V_STRING, false, 1, "localStreamName"))
+				|| ((string) temp.GetValue("localStreamName", false) == "")) {
+			WARN("External stream configuration is doesn't have localStreamName property invalid:\n%s",
+					STR(temp.ToString()));
 			continue;
 		}
+		string localStreamName = (string) temp.GetValue("localStreamName", false);
+		if (!GetAllowDuplicateInboundNetworkStreams()) {
+			if (streamConfigs.HasKey(localStreamName)) {
+				WARN("External stream configuration produces duplicated stream names\n%s",
+						STR(temp.ToString()));
+				continue;
+			}
+		}
+		streamConfigs[localStreamName] = temp;
+	}
+
+
+	//2. Loop over the stream definitions and spawn the streams
+
+	FOR_MAP(streamConfigs, string, Variant, i) {
+		Variant &streamConfig = MAP_VAL(i);
 		if (!PullExternalStream(streamConfig)) {
 			WARN("External stream configuration is invalid:\n%s",
 					STR(streamConfig.ToString()));
@@ -212,14 +300,15 @@ bool BaseClientApplication::PullExternalStream(Variant streamConfig) {
 		FATAL("Invalid URI: %s", STR(streamConfig["uri"].ToString()));
 		return false;
 	}
-	streamConfig["uri"] = uri.ToVariant();
+	streamConfig["uri"] = uri;
 
 	//3. Depending on the scheme name, get the curresponding protocol handler
 	///TODO: integrate this into protocol factory manager via protocol factories
-	BaseAppProtocolHandler *pProtocolHandler = GetProtocolHandler(uri.scheme);
+	string scheme = uri.scheme();
+	BaseAppProtocolHandler *pProtocolHandler = GetProtocolHandler(scheme);
 	if (pProtocolHandler == NULL) {
 		WARN("Unable to find protocol handler for scheme %s in application %s",
-				STR(uri.scheme),
+				STR(scheme),
 				STR(GetName()));
 		return false;
 	}
@@ -244,13 +333,7 @@ bool BaseClientApplication::PushLocalStream(Variant streamConfig) {
 		FATAL("Invalid local stream name");
 		return false;
 	}
-	StreamsManager *pStreamsManager = GetStreamsManager();
-	map<uint32_t, BaseStream *> streams = pStreamsManager->FindByTypeByName(
-			ST_IN_NET, streamName, true, true);
-	if (streams.size() == 0) {
-		FATAL("Stream %s not found", STR(streamName));
-		return false;
-	}
+	streamConfig["localStreamName"] = streamName;
 
 	//2. Split the URI
 	URI uri;
@@ -258,21 +341,58 @@ bool BaseClientApplication::PushLocalStream(Variant streamConfig) {
 		FATAL("Invalid URI: %s", STR(streamConfig["targetUri"].ToString()));
 		return false;
 	}
-	streamConfig["targetUri"] = uri.ToVariant();
+	streamConfig["targetUri"] = uri;
 
 	//3. Depending on the scheme name, get the curresponding protocol handler
 	///TODO: integrate this into protocol factory manager via protocol factories
-	BaseAppProtocolHandler *pProtocolHandler = GetProtocolHandler(uri.scheme);
+	string scheme = uri.scheme();
+	BaseAppProtocolHandler *pProtocolHandler = GetProtocolHandler(scheme);
 	if (pProtocolHandler == NULL) {
 		WARN("Unable to find protocol handler for scheme %s in application %s",
-				STR(uri.scheme),
+				STR(scheme),
 				STR(GetName()));
 		return false;
 	}
 
 	//4. Initiate the stream pulling sequence
-	return pProtocolHandler->PushLocalStream(
-			(BaseInStream *) MAP_VAL(streams.begin()), streamConfig);
+	return pProtocolHandler->PushLocalStream(streamConfig);
+}
+
+bool BaseClientApplication::ParseAuthentication() {
+	//1. Get the authentication configuration node
+	if (!_configuration.HasKeyChain(V_MAP, false, 1, CONF_APPLICATION_AUTH)) {
+		if (_configuration.HasKey(CONF_APPLICATION_AUTH, false)) {
+			WARN("Authentication node is present for application %s but is empty or invalid", STR(_name));
+		}
+		return true;
+	}
+	Variant &auth = _configuration[CONF_APPLICATION_AUTH];
+
+	//2. Cycle over all access schemas
+
+	FOR_MAP(auth, string, Variant, i) {
+		//3. get the schema
+		string scheme = MAP_KEY(i);
+
+		//4. Get the handler
+		BaseAppProtocolHandler *pHandler = GetProtocolHandler(scheme);
+		if (pHandler == NULL) {
+			WARN("Authentication parsing for app name %s failed. No handler registered for schema %s",
+					STR(_name),
+					STR(scheme));
+			return true;
+		}
+
+		//5. Call the handler
+		if (!pHandler->ParseAuthenticationNode(MAP_VAL(i), _authSettings[scheme])) {
+			FATAL("Authentication parsing for app name %s failed. scheme was %s",
+					STR(_name),
+					STR(scheme));
+			return false;
+		}
+	}
+
+	return true;
 }
 
 void BaseClientApplication::Shutdown(BaseClientApplication *pApplication) {
@@ -320,4 +440,53 @@ void BaseClientApplication::Shutdown(BaseClientApplication *pApplication) {
 
 	//5. Delete it
 	delete pApplication;
+}
+
+string BaseClientApplication::GetServiceInfo(IOHandler *pIOHandler) {
+	if ((pIOHandler->GetType() != IOHT_ACCEPTOR)
+			&& (pIOHandler->GetType() != IOHT_UDP_CARRIER))
+		return "";
+	if (pIOHandler->GetType() == IOHT_ACCEPTOR) {
+		if ((((TCPAcceptor *) pIOHandler)->GetApplication() == NULL)
+				|| (((TCPAcceptor *) pIOHandler)->GetApplication()->GetId() != GetId())) {
+			return "";
+		}
+	} else {
+		if ((((UDPCarrier *) pIOHandler)->GetProtocol() == NULL)
+				|| (((UDPCarrier *) pIOHandler)->GetProtocol()->GetNearEndpoint()->GetApplication() == NULL)
+				|| (((UDPCarrier *) pIOHandler)->GetProtocol()->GetNearEndpoint()->GetApplication()->GetId() != GetId())) {
+			return "";
+		}
+	}
+	Variant &params = pIOHandler->GetType() == IOHT_ACCEPTOR ?
+			((TCPAcceptor *) pIOHandler)->GetParameters()
+			: ((UDPCarrier *) pIOHandler)->GetParameters();
+	if (params != V_MAP)
+		return "";
+	stringstream ss;
+	ss << "+---+---------------+-----+-------------------------+-------------------------+" << endl;
+	ss << "|";
+	ss.width(3);
+	ss << (pIOHandler->GetType() == IOHT_ACCEPTOR ? "tcp" : "udp");
+	ss << "|";
+
+	ss.width(3 * 4 + 3);
+	ss << (string) params[CONF_IP];
+	ss << "|";
+
+	ss.width(5);
+	ss << (uint16_t) params[CONF_PORT];
+	ss << "|";
+
+	ss.width(25);
+	ss << (string) params[CONF_PROTOCOL];
+	ss << "|";
+
+	ss.width(25);
+	ss << GetName();
+	ss << "|";
+
+	ss << endl;
+
+	return ss.str();
 }

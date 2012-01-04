@@ -23,20 +23,68 @@
 
 //define missing PRI_64 specifiers
 #ifndef PRId64
-#define PRId64 "lld"
+#define PRId64 "I64d"
 #endif /* PRId64 */
 
 #ifndef PRIu64
-#define PRIu64 "llu"
+#define PRIu64 "I64u"
 #endif /* PRIu64 */
 
 #ifndef PRIx64
-#define PRIx64 "llx"
+#define PRIx64 "I64x"
 #endif /* PRIx64 */
 
 #ifndef PRIX64
-#define PRIX64 "llX"
+#define PRIX64 "I64X"
 #endif /* PRIX64 */
+
+#ifndef PRId32
+#define PRId32 "I32d"
+#endif /* PRId32 */
+
+#ifndef PRIu32
+#define PRIu32 "I32u"
+#endif /* PRIu32 */
+
+#ifndef PRIx32
+#define PRIx32 "I32x"
+#endif /* PRIx32 */
+
+#ifndef PRIX32
+#define PRIX32 "I32X"
+#endif /* PRIX32 */
+
+#ifndef PRId16
+#define PRId16 "hd"
+#endif /* PRId16 */
+
+#ifndef PRIu16
+#define PRIu16 "hu"
+#endif /* PRIu16 */
+
+#ifndef PRIx16
+#define PRIx16 "hx"
+#endif /* PRIx16 */
+
+#ifndef PRIX16
+#define PRIX16 "hX"
+#endif /* PRIX16 */
+
+#ifndef PRId8
+#define PRId8 "d"
+#endif /* PRId8 */
+
+#ifndef PRIu8
+#define PRIu8 "u"
+#endif /* PRIu8 */
+
+#ifndef PRIx8
+#define PRIx8 "x"
+#endif /* PRIx8 */
+
+#ifndef PRIX8
+#define PRIX8 "X"
+#endif /* PRIX8 */
 
 #ifndef PRIz
 #define PRIz "I"
@@ -54,9 +102,7 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <fstream>
 #include <fcntl.h>
-#include <iostream>
 #include <sstream>
 #include <cctype>
 #include <algorithm>
@@ -88,7 +134,7 @@ typedef long long int int64_t;
 #define MSG_NOSIGNAL 0
 #define READ_FD _read
 #define WRITE_FD _write
-#define CLOSE_SOCKET(fd) closesocket(fd)
+#define CLOSE_SOCKET(fd) if((fd)>=0) closesocket((fd))
 #define LASTSOCKETERROR WSAGetLastError()
 #define SOCKERROR_CONNECT_IN_PROGRESS	WSAEWOULDBLOCK
 #define SOCKERROR_SEND_IN_PROGRESS		WSAEWOULDBLOCK
@@ -114,7 +160,7 @@ typedef long long int int64_t;
 #define Timestamp struct tm
 #define Timestamp_init {0, 0, 0, 0, 0, 0, 0, 0, 0}
 #define snprintf sprintf_s
-
+#define pid_t int32_t
 
 #define gmtime_r(_p_time_t, _p_struct_tm) *(_p_struct_tm) = *gmtime(_p_time_t);
 
@@ -147,22 +193,21 @@ typedef struct _select_event {
 	uint8_t type;
 } select_event;
 
-struct iovec {
-	void *iov_base; /* Base address. */
-	size_t iov_len; /* Length. */
-};
-
-struct msghdr {
-	void *msg_name; /* optional address */
-	int msg_namelen; /* size of address */
-	struct iovec *msg_iov; /* scatter/gather array */
-	int msg_iovlen; /* # elements in msg_iov */
-	void *msg_control; /* ancillary data, see below */
-	int msg_controllen; /* ancillary data buffer len */
-	int msg_flags; /* flags on received message */
-};
-
 #define FD_COPY(f, t)   (void)(*(t) = *(f))
+
+#define MSGHDR WSAMSG
+#define IOVEC WSABUF
+#define MSGHDR_MSG_IOV lpBuffers
+#define MSGHDR_MSG_IOVLEN dwBufferCount
+#define MSGHDR_MSG_NAME name
+#define MSGHDR_MSG_NAMELEN namelen
+#define IOVEC_IOV_BASE buf
+#define IOVEC_IOV_LEN len
+#define IOVEC_IOV_BASE_TYPE CHAR
+#define SENDMSG(s,msg,flags,sent) WSASendMsg(s,msg,flags,sent,NULL,NULL)
+
+#define ftell64 _ftelli64
+#define fseek64 _fseeki64
 
 DLLEXP string format(string fmt, ...);
 DLLEXP string vFormat(string fmt, va_list args);
@@ -177,8 +222,12 @@ DLLEXP bool setFdNoSIGPIPE(int32_t fd);
 DLLEXP bool setFdKeepAlive(int32_t fd);
 DLLEXP bool setFdNoNagle(int32_t fd);
 DLLEXP bool setFdReuseAddress(int32_t fd);
+DLLEXP bool setFdTTL(int32_t fd, uint8_t ttl);
+DLLEXP bool setFdMulticastTTL(int32_t fd, uint8_t ttl);
+DLLEXP bool setFdTOS(int32_t fd, uint8_t tos);
 DLLEXP bool setFdOptions(int32_t fd);
 DLLEXP bool deleteFile(string path);
+DLLEXP bool deleteFolder(string path, bool force);
 DLLEXP string getHostByName(string name);
 DLLEXP bool isNumeric(string value);
 DLLEXP void split(string str, string separator, vector<string> &result);
@@ -187,6 +236,7 @@ DLLEXP string generateRandomString(uint32_t length);
 DLLEXP void lTrim(string &value);
 DLLEXP void rTrim(string &value);
 DLLEXP void trim(string &value);
+DLLEXP int8_t getCPUCount();
 DLLEXP map<string, string> mapping(string str, string separator1, string separator2, bool trimStrings);
 DLLEXP void splitFileName(string fileName, string &name, string &extension, char separator = '.');
 DLLEXP double getFileModificationDate(string path);
@@ -204,7 +254,6 @@ DLLEXP int strncasecmp(const char *s1, const char *s2, size_t n);
 DLLEXP int vasprintf(char **strp, const char *fmt, va_list ap, int size = 256);
 DLLEXP int gettimeofday(struct timeval *tv, void* tz);
 DLLEXP void InitNetworking();
-DLLEXP int sendmsg(int s, const struct msghdr *msg, int flags);
 DLLEXP HMODULE UnicodeLoadLibrary(string fileName);
 DLLEXP int inet_aton(const char *pStr, struct in_addr *pRes);
 

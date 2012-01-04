@@ -39,8 +39,6 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fstream>
-#include <iostream>
 #include <list>
 #include <map>
 #include <netdb.h>
@@ -61,7 +59,7 @@ using namespace std;
 //platform defines
 #define DLLEXP
 #define HAS_MMAP 1
-#define COLOR_TYPE string
+#define COLOR_TYPE const char *
 #define FATAL_COLOR "\033[01;31m"
 #define ERROR_COLOR "\033[22;31m"
 #define WARNING_COLOR "\033[01;33m"
@@ -70,7 +68,7 @@ using namespace std;
 #define FINE_COLOR "\033[22;37m"
 #define FINEST_COLOR "\033[22;37m"
 #define NORMAL_COLOR "\033[0m"
-#define SET_CONSOLE_TEXT_COLOR(color) cout<<color
+#define SET_CONSOLE_TEXT_COLOR(color) fprintf(stdout,"%s",color)
 #define READ_FD read
 #define WRITE_FD write
 #define LASTSOCKETERROR					errno
@@ -84,7 +82,7 @@ using namespace std;
 #define GET_PROC_ADDRESS(libHandler, procName) dlsym((libHandler), (procName))
 #define LIBRARY_NAME_PATTERN "lib%s.so"
 #define PATH_SEPARATOR '/'
-#define CLOSE_SOCKET(fd) close(fd)
+#define CLOSE_SOCKET(fd) if((fd)>=0) close((fd))
 #define InitNetworking()
 #define MAP_NOCACHE 0
 #define MAP_NOEXTEND 0
@@ -137,6 +135,20 @@ typedef struct _select_event {
 	uint8_t type;
 } select_event;
 
+#define MSGHDR struct msghdr
+#define IOVEC iovec
+#define MSGHDR_MSG_IOV msg_iov
+#define MSGHDR_MSG_IOVLEN msg_iovlen
+#define MSGHDR_MSG_NAME msg_name
+#define MSGHDR_MSG_NAMELEN msg_namelen
+#define IOVEC_IOV_BASE iov_base
+#define IOVEC_IOV_LEN iov_len
+#define IOVEC_IOV_BASE_TYPE uint8_t
+#define SENDMSG(s,msg,flags,sent) sendmsg(s,msg,flags)
+
+#define ftell64 ftello64
+#define fseek64 fseeko64
+
 string format(string fmt, ...);
 string vFormat(string fmt, va_list args);
 void replace(string &target, string search, string replacement);
@@ -150,8 +162,12 @@ bool setFdNoSIGPIPE(int32_t fd);
 bool setFdKeepAlive(int32_t fd);
 bool setFdNoNagle(int32_t fd);
 bool setFdReuseAddress(int32_t fd);
+bool setFdTTL(int32_t fd, uint8_t ttl);
+bool setFdMulticastTTL(int32_t fd, uint8_t ttl);
+bool setFdTOS(int32_t fd, uint8_t tos);
 bool setFdOptions(int32_t fd);
 bool deleteFile(string path);
+bool deleteFolder(string path, bool force);
 string getHostByName(string name);
 bool isNumeric(string value);
 void split(string str, string separator, vector<string> &result);
@@ -160,6 +176,7 @@ string generateRandomString(uint32_t length);
 void lTrim(string &value);
 void rTrim(string &value);
 void trim(string &value);
+int8_t getCPUCount();
 map<string, string> mapping(string str, string separator1, string separator2, bool trimStrings);
 void splitFileName(string fileName, string &name, string &extension, char separator = '.');
 double getFileModificationDate(string path);

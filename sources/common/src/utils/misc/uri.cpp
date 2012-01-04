@@ -21,222 +21,270 @@
 #include "utils/misc/uri.h"
 #include "utils/logging/logging.h"
 
-//#define LOG_URI_SPLIT(...) FINEST(__VA_ARGS__)
-#define LOG_URI_SPLIT(...)
+static map<string, uint16_t> _schemeToPort;
+//Variant URI::_dummy;
 
-static map<string, uint16_t> ___schemeToPort;
+#ifdef DEBUG_URI
+#define LOG_URI(...) FINEST(__VA_ARGS__)
+#else
+#define LOG_URI(...)
+#endif /* DEBUG_URI */
 
 bool parseURI(string stringUri, URI &uri) {
-	LOG_URI_SPLIT("stringUri: %s", STR(stringUri));
+	/*
+	 * schema://[username[:password]@]host[:port][/[path[?parameters]]]
+	 */
+	LOG_URI("------------------------");
+	LOG_URI("stringUri: `%s`", STR(stringUri));
+	string fullUri;
+	string fullUriWithAuth = stringUri;
+	string scheme;
+	string authentication;
+	string username;
+	string password;
+	string hostPort;
+	string host;
+	string portString;
+	uint16_t port = 0;
+	bool portSpecified = false;
+	string fullDocumentPathWithParameters;
+	string fullDocumentPath;
+	string fullParameters;
+	string documentPath;
+	string document;
+	string documentWithFullParameters;
+	Variant parameters;
+
+	string::size_type cursor = 0;
+	string::size_type pos = 0;
+
+	//1. Reset
 	uri.Reset();
+
+	//2. trim
 	trim(stringUri);
-	if (stringUri == "")
+	if (stringUri == "") {
+		FATAL("Empty uri");
 		return false;
-
-	if (stringUri.size() > 1024)
-		return false;
-
-	uri.fullUri = stringUri;
-	LOG_URI_SPLIT("uri.fullUri: %s", STR(uri.fullUri));
-
-
-	// scheme://user:pwd@host:port/document/parts/here
-
-	vector<string> components;
-	split(stringUri, "/", components);
-	for (uint32_t i = 0; i < components.size(); i++) {
-		LOG_URI_SPLIT("%u: %s", i, STR(components[i]));
 	}
 
-	//0 - scheme:
-	if (components[0] == "")
+	//2. Get the scheme and the default port
+	pos = stringUri.find("://", cursor);
+	if (pos == string::npos) {
+		FATAL("Unable to determine scheme");
 		return false;
-
-	if (components[0][components[0].size() - 1] != ':')
-		return false;
-
-	uri.scheme = lowerCase(components[0].substr(0, components[0].size() - 1));
-	LOG_URI_SPLIT("uri.scheme: %s", STR(uri.scheme));
-
-
-	//1 - nothing
-	if (components[1] != "")
-		return false;
-
-	//2 - user:pwd@host:port
-	vector<string> hostComponents;
-	if (components[2].find("@") != string::npos) {
-		split(components[2], "@", hostComponents);
-		if (hostComponents.size() != 2)
-			return false;
-		if ((hostComponents[0] == "")
-				|| (hostComponents[1] == "")) {
-			return false;
-		}
-		components[2] = hostComponents[1];
-		vector<string> userNamePasswordComponents;
-		split(hostComponents[0], ":", userNamePasswordComponents);
-		if (userNamePasswordComponents.size() != 2)
-			return false;
-		if ((userNamePasswordComponents[0] == "")
-				|| (userNamePasswordComponents[1] == "")) {
-			return false;
-		}
-		uri.userName = userNamePasswordComponents[0];
-		LOG_URI_SPLIT("uri.userName: %s", STR(uri.userName));
-		uri.password = userNamePasswordComponents[1];
-		LOG_URI_SPLIT("uri.password: %s", STR(uri.password));
 	}
+	scheme = lowerCase(stringUri.substr(cursor, pos - cursor));
+	cursor = pos + 3;
+	if (_schemeToPort.size() == 0) {
+		_schemeToPort["http"] = 80;
+		_schemeToPort["rtmpt"] = 80;
+		_schemeToPort["rtmpte"] = 80;
+		_schemeToPort["https"] = 443;
+		_schemeToPort["rtmps"] = 443;
+		_schemeToPort["rtsp"] = 554;
+		_schemeToPort["rtmp"] = 1935;
+		_schemeToPort["rtmpe"] = 1935;
+		_schemeToPort["mms"] = 1755;
+	}
+	if (MAP_HAS1(_schemeToPort, scheme)) {
+		port = _schemeToPort[scheme];
+	}
+	//	else {
+	//		FATAL("Scheme `%s` not supported", STR(scheme));
+	//		return false;
+	//	}
+	LOG_URI("scheme: %s; default port: %"PRIu16, STR(scheme), port);
 
-	split(components[2], ":", hostComponents);
-	if (hostComponents.size() == 1) {
-		if (hostComponents[0] == "")
-			return false;
-		uri.host = hostComponents[0];
-		LOG_URI_SPLIT("uri.host: %s", STR(uri.host));
-	} else if (hostComponents.size() == 2) {
-		if ((hostComponents[0] == "")
-				|| (hostComponents[0] == ""))
-			return false;
-		uri.host = hostComponents[0];
-		LOG_URI_SPLIT("uri.host: %s", STR(uri.host));
-		int32_t port = atoi(STR(hostComponents[1]));
-		if ((port <= 0) || (port > 65535))
-			return false;
-		uri.port = (uint16_t) port;
+	//3. get the authentication portion. the search starts from
+	//where the scheme detection left and up to the first / character
+	string::size_type limit = stringUri.find("/", cursor);
+	bool hasAuthentication = false;
+	pos = stringUri.find("@", cursor);
+	if (pos != string::npos) {
+		if (limit != string::npos) {
+			hasAuthentication = pos<limit;
+		}
+		hasAuthentication = true;
+	}
+	if (hasAuthentication) {
+		authentication = stringUri.substr(cursor, pos - cursor);
+		fullUri = stringUri.substr(0, cursor);
+		fullUri += stringUri.substr(pos + 1);
+		cursor = pos + 1;
 	} else {
+		fullUri = fullUriWithAuth;
+	}
+	if (authentication != "") {
+		pos = authentication.find(":");
+		if (pos != string::npos) {
+			username = authentication.substr(0, pos);
+			password = authentication.substr(pos + 1);
+		} else {
+			username = authentication;
+			password = "";
+		}
+	}
+	LOG_URI("fullUri: `%s`; fullUriWithAuth: `%s`", STR(fullUri), STR(fullUriWithAuth));
+	LOG_URI("username: `%s`; password: `%s`", STR(username), STR(password));
+
+	//4. Get the host:port
+	pos = stringUri.find("/", cursor);
+	if (pos == string::npos) {
+		hostPort = stringUri.substr(cursor);
+		cursor = stringUri.size() - 1;
+		fullDocumentPathWithParameters = "/";
+	} else {
+		hostPort = stringUri.substr(cursor, pos - cursor);
+		cursor = pos + 1;
+		fullDocumentPathWithParameters = "/" + stringUri.substr(cursor);
+	}
+	trim(hostPort);
+	if (hostPort == "") {
+		FATAL("Invalid host:port specified");
 		return false;
 	}
-
-	if (uri.port == 0) {
-		if (___schemeToPort.size() == 0) {
-			___schemeToPort["http"] = 80;
-			___schemeToPort["rtmpt"] = 80;
-			___schemeToPort["rtmpte"] = 80;
-			___schemeToPort["https"] = 443;
-			___schemeToPort["rtmps"] = 443;
-			___schemeToPort["rtsp"] = 554;
-			___schemeToPort["rtmp"] = 1935;
-			___schemeToPort["rtmpe"] = 1935;
-			___schemeToPort["mms"] = 1755;
-		}
-		if (MAP_HAS1(___schemeToPort, uri.scheme))
-			uri.port = ___schemeToPort[uri.scheme];
-		else
+	pos = hostPort.find(":");
+	if (pos == string::npos) {
+		host = hostPort;
+		portSpecified = false;
+	} else {
+		host = hostPort.substr(0, pos);
+		trim(host);
+		portString = hostPort.substr(pos + 1);
+		portSpecified = true;
+		port = (uint16_t) atoi(STR(portString));
+		if (format("%"PRIu16, port) != portString) {
+			FATAL("Invalid port number specified: `%s`", STR(portString));
 			return false;
+		}
 	}
-	LOG_URI_SPLIT("uri.port: %u", uri.port);
+	LOG_URI("host: %s; port: %"PRIu16"; portSpecified: %d", STR(host), port, portSpecified);
 
-	for (uint32_t i = 3; i < components.size(); i++) {
-		uri.fullDocumentPath += "/" + components[i];
-	}
-	LOG_URI_SPLIT("uri.fullDocumentPath: %s", STR(uri.fullDocumentPath));
+	//5. fullDocumentPathWithParameters
+	fullDocumentPath = "/";
+	fullParameters = "";
+	documentPath = "/";
+	document = "";
+	documentWithFullParameters = "";
+	parameters.Reset();
+	parameters.IsArray(false);
+	if (fullDocumentPathWithParameters != "/") {
+		pos = fullDocumentPathWithParameters.find("?");
+		if (pos == string::npos) {
+			fullDocumentPath = fullDocumentPathWithParameters;
+			fullParameters = "";
+		} else {
+			fullDocumentPath = fullDocumentPathWithParameters.substr(0, pos);
+			fullParameters = fullDocumentPathWithParameters.substr(pos + 1);
+		}
 
-	uri.documentPath = "/";
-	for (uint32_t i = 3; i < components.size() - 1; i++) {
-		uri.documentPath += components[i];
-		if (i != components.size() - 2)
-			uri.documentPath += "/";
-	}
-	LOG_URI_SPLIT("uri.documentPath: %s", STR(uri.documentPath));
-
-	if ((components.size() - 1) >= 3) {
-		uri.document = components[components.size() - 1];
-		vector<string> documentComponents;
-		split(uri.document, "?", documentComponents);
-		if (documentComponents.size() == 2) {
-			uri.document = documentComponents[0];
-			map<string, string> params;
-			params = mapping(documentComponents[1], "&", "=", true);
-
-			FOR_MAP(params, string, string, i) {
-				uri.parameters[MAP_KEY(i)] = MAP_VAL(i);
-				LOG_URI_SPLIT("uri.parameters[\"%s\"]: %s",
-						STR(MAP_KEY(i)),
-						STR(MAP_VAL(i)));
+		trim(fullParameters);
+		if (fullParameters != "") {
+			vector<string> elements;
+			split(fullParameters, "&", elements);
+			for (uint32_t i = 0; i < elements.size(); i++) {
+				string kvp = elements[i];
+				if (kvp == "")
+					continue;
+				string k = "";
+				string v = "";
+				pos = kvp.find("=");
+				if (pos == string::npos) {
+					k = kvp;
+					v = "";
+				} else {
+					k = kvp.substr(0, pos);
+					v = kvp.substr(pos + 1);
+				}
+				if (k == "")
+					continue;
+				parameters[k] = v;
 			}
 		}
+
+		for (string::size_type i = fullDocumentPath.size() - 1; i >= 0; i--) {
+			if (fullDocumentPath[i] == '/')
+				break;
+			document = fullDocumentPath[i] + document;
+		}
+		documentPath = fullDocumentPath.substr(0, fullDocumentPath.size() - document.size());
+		documentWithFullParameters = document;
+		if (fullParameters != "")
+			documentWithFullParameters += "?" + fullParameters;
 	}
-	LOG_URI_SPLIT("uri.document: %s", STR(uri.document));
+	LOG_URI("fullDocumentPathWithParameters: `%s`", STR(fullDocumentPathWithParameters));
+	LOG_URI("fullDocumentPath: `%s`", STR(fullDocumentPath));
+	LOG_URI("fullParameters: `%s`", STR(fullParameters));
+	LOG_URI("documentPath: `%s`", STR(documentPath));
+	LOG_URI("document: `%s`", STR(document));
+	LOG_URI("documentWithFullParameters: `%s`", STR(documentWithFullParameters));
+	LOG_URI("parameters:");
+#ifdef DEBUG_URI
+
+	FOR_MAP(parameters, string, Variant, i) {
+		LOG_URI("\t`%s`: `%s`", STR(MAP_KEY(i)), STR(MAP_VAL(i)));
+	}
+#endif /* DEBUG_URI */
+
+	if (port == 0) {
+		FATAL("Invalid URI. No port specified and the scheme `%s` is unknown", STR(scheme));
+		return false;
+	}
+	uri.originalUri(stringUri);
+	uri.fullUri(fullUri);
+	uri.fullUriWithAuth(fullUriWithAuth);
+	uri.scheme(scheme);
+	uri.userName(username);
+	uri.password(password);
+	uri.host(host);
+	uri.port(port);
+	uri.portSpecified(portSpecified);
+	uri.fullDocumentPathWithParameters(fullDocumentPathWithParameters);
+	uri.fullDocumentPath(fullDocumentPath);
+	uri.fullParameters(fullParameters);
+	uri.documentPath(documentPath);
+	uri.document(document);
+	uri.documentWithFullParameters(documentWithFullParameters);
+	uri.parameters(parameters);
 
 	return true;
-}
-
-void URI::Reset() {
-	fullUri = scheme = host = userName = password = fullDocumentPath = documentPath = document = "";
-	port = 0;
-	parameters.clear();
-}
-
-Variant URI::ToVariant() {
-	Variant result;
-	result["fullUri"] = fullUri;
-	result["scheme"] = scheme;
-	result["host"] = host;
-	result["ip"] = ip;
-	result["port"] = (uint16_t) port;
-	result["userName"] = userName;
-	result["password"] = password;
-	result["fullDocumentPath"] = fullDocumentPath;
-	result["documentPath"] = documentPath;
-	result["document"] = document;
-
-	FOR_MAP(parameters, string, string, i) {
-		result["parameters"][MAP_KEY(i)] = MAP_VAL(i);
-	}
-
-	return result;
 }
 
 bool URI::FromVariant(Variant & variant, URI &uri) {
 	uri.Reset();
 
-	if (variant != V_MAP)
+	if (variant != V_MAP) {
+		FATAL("Variant is not a map");
 		return false;
+	}
 
-	if ((!(variant.HasKey("fullUri")))
-			|| (!(variant.HasKey("scheme")))
-			|| (!(variant.HasKey("host")))
-			|| (!(variant.HasKey("ip")))
-			|| (!(variant.HasKey("port")))
-			|| (!(variant.HasKey("userName")))
-			|| (!(variant.HasKey("password")))
-			|| (!(variant.HasKey("fullDocumentPath")))
-			|| (!(variant.HasKey("documentPath")))
-			|| (!(variant.HasKey("document")))
+	if ((!(variant.HasKeyChain(V_STRING, true, 1, "originalUri")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "fullUri")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "fullUriWithAuth")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "scheme")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "userName")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "password")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "host")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "ip")))
+			|| (!(variant.HasKeyChain(_V_NUMERIC, true, 1, "port")))
+			|| (!(variant.HasKeyChain(V_BOOL, true, 1, "portSpecified")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "fullDocumentPathWithParameters")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "fullDocumentPath")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "fullParameters")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "documentPath")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "document")))
+			|| (!(variant.HasKeyChain(V_STRING, true, 1, "documentWithFullParameters")))
+			|| (!(variant.HasKeyChain(V_MAP, true, 1, "parameters")))
 			) {
+		FATAL("One or more type mismatch");
 		return false;
 	}
 
-	if ((variant["fullUri"] != V_STRING)
-			|| (variant["scheme"] != V_STRING)
-			|| (variant["host"] != V_STRING)
-			|| (variant["ip"] != V_STRING)
-			|| (variant["port"] != _V_NUMERIC)
-			|| (variant["userName"] != V_STRING)
-			|| (variant["password"] != V_STRING)
-			|| (variant["fullDocumentPath"] != V_STRING)
-			|| (variant["documentPath"] != V_STRING)
-			|| (variant["document"] != V_STRING)) {
-		return false;
-	}
-
-	uri.fullUri = (string) variant["fullUri"];
-	uri.scheme = (string) variant["scheme"];
-	uri.host = (string) variant["host"];
-	uri.ip = (string) variant["ip"];
-	uri.port = (uint16_t) variant["port"];
-	uri.userName = (string) variant["userName"];
-	uri.password = (string) variant["password"];
-	uri.fullDocumentPath = (string) variant["fullDocumentPath"];
-	uri.documentPath = (string) variant["documentPath"];
-	uri.document = (string) variant["document"];
+	Variant *pURI = (Variant *) & uri;
+	*pURI = variant;
 
 	return true;
-}
-
-string URI::ToString() {
-	return fullUri;
 }
 
 bool URI::FromString(string stringUri, bool resolveHost, URI &uri) {
@@ -246,12 +294,15 @@ bool URI::FromString(string stringUri, bool resolveHost, URI &uri) {
 	}
 
 	if (resolveHost) {
-		uri.ip = getHostByName(uri.host);
-		if (uri.ip == "") {
-			FATAL("Unable to resolve host: %s", STR(uri.host));
+		string ip = getHostByName(uri.host());
+		if (ip == "") {
+			FATAL("Unable to resolve host: %s", STR(uri.host()));
 			uri.Reset();
 			return false;
 		}
+		uri.ip(ip);
+	} else {
+		uri.ip("");
 	}
 
 	return true;

@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -23,6 +23,7 @@
 
 #include "common.h"
 #include "netio/epoll/iohandlermanagertoken.h"
+#include "netio/fdstats.h"
 
 class IOHandler;
 
@@ -40,15 +41,26 @@ private:
 	static vector<IOHandlerManagerToken *> *_pRecycledTokens;
 	static TimersManager *_pTimersManager;
 	static struct epoll_event _dummy;
+	static FdStats _fdStats;
 public:
 	static map<uint32_t, IOHandler *> & GetActiveHandlers();
 	static map<uint32_t, IOHandler *> & GetDeadHandlers();
+	static FdStats &GetStats();
 	static void Initialize();
+	static void Start();
 	static void SignalShutdown();
 	static void ShutdownIOHandlers();
 	static void Shutdown();
 	static void RegisterIOHandler(IOHandler *pIOHandler);
 	static void UnRegisterIOHandler(IOHandler *pIOHandler);
+	static int CreateRawUDPSocket();
+	static void CloseRawUDPSocket(int socket);
+#ifdef GLOBALLY_ACCOUNT_BYTES
+	static void AddInBytesManaged(IOHandlerType type, uint64_t bytes);
+	static void AddOutBytesManaged(IOHandlerType type, uint64_t bytes);
+	static void AddInBytesRawUdp(uint64_t bytes);
+	static void AddOutBytesRawUdp(uint64_t bytes);
+#endif /* GLOBALLY_ACCOUNT_BYTES */
 	static bool EnableReadData(IOHandler *pIOHandler);
 	static bool DisableReadData(IOHandler *pIOHandler, bool ignoreError = false);
 	static bool EnableWriteData(IOHandler *pIOHandler);

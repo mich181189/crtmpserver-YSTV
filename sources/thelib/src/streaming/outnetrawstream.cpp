@@ -39,12 +39,14 @@ OutNetRawStream::OutNetRawStream(BaseProtocol *pProtocol,
 OutNetRawStream::~OutNetRawStream() {
 }
 
-void OutNetRawStream::GetStats(Variant &info) {
-	BaseOutNetStream::GetStats(info);
-	info["audio"]["bytesCount"] = _bytesCount;
-	info["audio"]["packetsCount"] = _packetsCount;
+void OutNetRawStream::GetStats(Variant &info, uint32_t namespaceId) {
+	BaseOutNetStream::GetStats(info, namespaceId);
+	info["video"]["bytesCount"] = _bytesCount;
+	info["video"]["packetsCount"] = _packetsCount;
+	info["video"]["droppedPacketsCount"] = 0;
+	info["audio"]["bytesCount"] = 0;
+	info["audio"]["packetsCount"] = 0;
 	info["audio"]["droppedPacketsCount"] = 0;
-	info["video"] = info["audio"];
 }
 
 void OutNetRawStream::SignalAttachedToInStream() {

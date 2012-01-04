@@ -105,13 +105,18 @@ BaseInStream *BaseOutStream::GetInStream() {
 	return _pInStream;
 }
 
-void BaseOutStream::GetStats(Variant &info) {
-	BaseStream::GetStats(info);
+void BaseOutStream::GetStats(Variant &info, uint32_t namespaceId) {
+	BaseStream::GetStats(info, namespaceId);
 	if (_pInStream != NULL) {
-		info["inStreamUniqueId"] = _pInStream->GetUniqueId();
+		info["inStreamUniqueId"] = (((uint64_t) namespaceId) << 32) | _pInStream->GetUniqueId();
 	} else {
 		info["inStreamUniqueId"] = Variant();
 	}
+	StreamCapabilities *pCapabilities = GetCapabilities();
+	if (pCapabilities != NULL)
+		info["bandwidth"] = (uint32_t) pCapabilities->bandwidthHint;
+	else
+		info["bandwidth"] = (uint32_t) 0;
 }
 
 bool BaseOutStream::Play(double absoluteTimestamp, double length) {

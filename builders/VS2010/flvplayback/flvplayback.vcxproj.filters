@@ -32,10 +32,10 @@
     <ClCompile Include="..\..\..\sources\applications\flvplayback\src\rtspappprotocolhandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\sources\applications\flvplayback\src\rtmfpappprotocolhandler.cpp">
+    <ClCompile Include="..\dummy.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\dummy.cpp">
+    <ClCompile Include="..\..\..\sources\applications\flvplayback\src\httpappprotocolhandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -61,7 +61,7 @@
     <ClInclude Include="..\..\..\sources\applications\flvplayback\include\rtspappprotocolhandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\sources\applications\flvplayback\include\rtmfpappprotocolhandler.h">
+    <ClInclude Include="..\..\..\sources\applications\flvplayback\include\httpappprotocolhandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

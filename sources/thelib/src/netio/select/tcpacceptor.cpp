@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -50,9 +50,7 @@ TCPAcceptor::~TCPAcceptor() {
 	CLOSE_SOCKET(_inboundFd);
 }
 
-bool TCPAcceptor::StartAccept(BaseClientApplication *pApplication) {
-	_pApplication = pApplication;
-
+bool TCPAcceptor::Bind() {
 	_inboundFd = _outboundFd = (int) socket(PF_INET, SOCK_STREAM, 0);
 	if (_inboundFd < 0) {
 		int err = LASTSOCKETERROR;
@@ -75,13 +73,30 @@ bool TCPAcceptor::StartAccept(BaseClientApplication *pApplication) {
 		return false;
 	}
 
+	if (_port == 0) {
+		socklen_t tempSize = sizeof (sockaddr);
+		if (getsockname(_inboundFd, (sockaddr *) & _address, &tempSize) != 0) {
+			FATAL("Unable to extract the random port");
+			return false;
+		}
+		_parameters[CONF_PORT] = (uint16_t) ENTOHS(_address.sin_port);
+	}
+
 	if (listen(_inboundFd, 100) != 0) {
 		FATAL("Unable to put the socket in listening mode");
 		return false;
 	}
 
 	_enabled = true;
+	return true;
+}
 
+void TCPAcceptor::SetApplication(BaseClientApplication *pApplication) {
+	assert(_pApplication == NULL);
+	_pApplication = pApplication;
+}
+
+bool TCPAcceptor::StartAccept() {
 	return IOHandlerManager::EnableAcceptConnections(this);
 }
 
@@ -98,6 +113,12 @@ bool TCPAcceptor::OnEvent(select_event &event) {
 }
 
 bool TCPAcceptor::OnConnectionAvailable(select_event &event) {
+	if (_pApplication == NULL)
+		return Accept();
+	return _pApplication->AcceptTCPConnection(this);
+}
+
+bool TCPAcceptor::Accept() {
 	sockaddr address;
 	memset(&address, 0, sizeof (sockaddr));
 	socklen_t len = sizeof (sockaddr);
@@ -114,21 +135,22 @@ bool TCPAcceptor::OnConnectionAvailable(select_event &event) {
 	if (!_enabled) {
 		CLOSE_SOCKET(fd);
 		_droppedCount++;
-		WARN("Acceptor is not enabled. Client dropped: %s:%hu -> %s:%hu",
+		WARN("Acceptor is not enabled. Client dropped: %s:%"PRIu16" -> %s:%"PRIu16,
 				inet_ntoa(((sockaddr_in *) & address)->sin_addr),
 				ENTOHS(((sockaddr_in *) & address)->sin_port),
 				STR(_ipAddress),
 				_port);
 		return true;
 	}
-	INFO("Client connected: %s:%hu -> %s:%hu",
+	INFO("Client connected: %s:%"PRIu16" -> %s:%"PRIu16,
 			inet_ntoa(((sockaddr_in *) & address)->sin_addr),
 			ENTOHS(((sockaddr_in *) & address)->sin_port),
 			STR(_ipAddress),
 			_port);
 
-	if (!setFdOptions(_inboundFd)) {
+	if (!setFdOptions(fd)) {
 		FATAL("Unable to set socket options");
+		CLOSE_SOCKET(fd);
 		return false;
 	}
 
@@ -161,6 +183,32 @@ bool TCPAcceptor::OnConnectionAvailable(select_event &event) {
 	return true;
 }
 
+bool TCPAcceptor::Drop() {
+	sockaddr address;
+	memset(&address, 0, sizeof (sockaddr));
+	socklen_t len = sizeof (sockaddr);
+
+
+	//1. Accept the connection
+	int32_t fd = accept(_inboundFd, &address, &len);
+	if (fd < 0) {
+		uint32_t err = LASTSOCKETERROR;
+		WARN("Accept failed. Error code was: %"PRIu32, err);
+		return true;
+	}
+
+	//2. Drop it now
+	CLOSE_SOCKET(fd);
+	_droppedCount++;
+
+	INFO("Client explicitly dropped: %s:%"PRIu16" -> %s:%"PRIu16,
+			inet_ntoa(((sockaddr_in *) & address)->sin_addr),
+			ENTOHS(((sockaddr_in *) & address)->sin_port),
+			STR(_ipAddress),
+			_port);
+	return true;
+}
+
 Variant & TCPAcceptor::GetParameters() {
 	return _parameters;
 }
@@ -177,15 +225,18 @@ TCPAcceptor::operator string() {
 	return format("A(%d)", _inboundFd);
 }
 
-void TCPAcceptor::GetStats(Variant &info) {
+void TCPAcceptor::GetStats(Variant &info, uint32_t namespaceId) {
 	info = _parameters;
-	info["id"] = GetId();
+	info["id"] = (((uint64_t) namespaceId) << 32) | GetId();
 	info["enabled"] = (bool)_enabled;
 	info["acceptedConnectionsCount"] = _acceptedCount;
 	info["droppedConnectionsCount"] = _droppedCount;
 	if (_pApplication != NULL) {
-		info["appId"] = _pApplication->GetId();
+		info["appId"] = (((uint64_t) namespaceId) << 32) | _pApplication->GetId();
 		info["appName"] = _pApplication->GetName();
+	} else {
+		info["appId"] = (((uint64_t) namespaceId) << 32);
+		info["appName"] = "";
 	}
 }
 

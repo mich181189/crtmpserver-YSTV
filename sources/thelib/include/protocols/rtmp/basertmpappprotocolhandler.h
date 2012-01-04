@@ -40,18 +40,25 @@ protected:
 	bool _renameBadFiles;
 	string _mediaFolder;
 	bool _externSeekGenerator;
+	bool _enableCheckBandwidth;
+	Variant _onBWCheckMessage;
+	Variant _onBWCheckStrippedMessage;
 	map<uint32_t, BaseRTMPProtocol *> _connections;
 	map<uint32_t, uint32_t> _nextInvokeId;
 	map<uint32_t, map<uint32_t, Variant > > _resultMessageTracking;
-	string _authMethod;
-	string _adobeAuthSalt;
 	bool _keyframeSeek;
 	int32_t _clientSideBuffer;
 	uint32_t _seekGranularity;
 	Variant _adobeAuthSettings;
+	string _authMethod;
+	string _adobeAuthSalt;
+	double _lastUsersFileUpdate;
+	Variant _users;
 public:
 	BaseRTMPAppProtocolHandler(Variant &configuration);
 	virtual ~BaseRTMPAppProtocolHandler();
+
+	virtual bool ParseAuthenticationNode(Variant &node, Variant &result);
 
 	/*
 	 * This will return true if the application has the validateHandshake flag
@@ -81,7 +88,7 @@ public:
 	 * This is called by the framework when a stream needs to be pushed forward
 	 * Basically, this will open a RTMP client and start publishing a stream
 	 * */
-	virtual bool PushLocalStream(BaseInStream *pInStream, Variant streamConfig);
+	virtual bool PushLocalStream(Variant streamConfig);
 
 	/*
 	 * This is called bt the framework when an outbound connection was established
@@ -130,6 +137,7 @@ public:
 	 * pFrom - the origin of the request
 	 * request - the complete request
 	 * */
+	virtual bool ProcessAbortMessage(BaseRTMPProtocol *pFrom, Variant &request);
 	virtual bool ProcessWinAckSize(BaseRTMPProtocol *pFrom, Variant &request);
 	virtual bool ProcessPeerBW(BaseRTMPProtocol *pFrom, Variant &request);
 	virtual bool ProcessAck(BaseRTMPProtocol *pFrom, Variant &request);
@@ -166,6 +174,8 @@ public:
 			Variant &request);
 	virtual bool ProcessInvokeOnBWDone(BaseRTMPProtocol *pFrom,
 			Variant &request);
+	virtual bool ProcessInvokeCheckBandwidth(BaseRTMPProtocol *pFrom,
+			Variant &request);
 	virtual bool ProcessInvokeGeneric(BaseRTMPProtocol *pFrom,
 			Variant &request);
 	virtual bool ProcessInvokeResult(BaseRTMPProtocol *pFrom,
@@ -186,6 +196,8 @@ public:
 	virtual bool ProcessInvokeCreateStreamResult(BaseRTMPProtocol *pFrom,
 			Variant &request, Variant &response);
 	virtual bool ProcessInvokeFCSubscribeResult(BaseRTMPProtocol *pFrom,
+			Variant &request, Variant &response);
+	virtual bool ProcessInvokeOnBWCheckResult(BaseRTMPProtocol *pFrom,
 			Variant &request, Variant &response);
 	virtual bool ProcessInvokeGenericResult(BaseRTMPProtocol *pFrom,
 			Variant &request, Variant &response);
@@ -222,6 +234,13 @@ public:
 	bool SendRTMPMessage(BaseRTMPProtocol *pTo, Variant message,
 			bool trackResponse = false);
 private:
+	/*
+	 * Will transform stream names of type streamName?param1=value1&param2=value2&...
+	 * into streamName-param1_value1-param2_value2...
+	 * All the '-' characters inside values will be replaced with '_'
+	 */
+	string NormalizeStreamName(string streamName);
+
 	/*
 	 * Tries to create an outbound stream and link it to the live inbound stream
 	 * streamName - the name of the live inbound stream
@@ -268,7 +287,13 @@ private:
 	/*
 	 * Send the initial connect invoke
 	 * */
-	bool ConnectForPullPush(BaseRTMPProtocol *pFrom, string uriPath, Variant &config);
+	bool ConnectForPullPush(BaseRTMPProtocol *pFrom, string uriPath,
+			Variant &config, bool isPull);
+
+	/*
+	 * Log Event
+	 **/
+	//Variant& CreateLogEventInvoke(BaseRTMPProtocol *pFrom, Variant &request);
 };
 
 

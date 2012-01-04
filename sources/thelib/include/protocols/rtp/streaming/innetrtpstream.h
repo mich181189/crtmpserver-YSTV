@@ -25,6 +25,10 @@
 #include "streaming/baseinnetstream.h"
 #include "protocols/rtp/rtpheader.h"
 
+#define RTCP_PRESENCE_UNKNOWN 0
+#define RTCP_PRESENCE_AVAILABLE 1
+#define RTCP_PRESENCE_ABSENT 2
+
 class DLLEXP InNetRTPStream
 : public BaseInNetStream {
 private:
@@ -32,25 +36,42 @@ private:
 
 	bool _hasAudio;
 	uint16_t _audioSequence;
-	uint32_t _audioPacketsCount;
-	uint32_t _audioDroppedPacketsCount;
-	uint32_t _audioBytesCount;
+	uint64_t _audioPacketsCount;
+	uint64_t _audioDroppedPacketsCount;
+	uint64_t _audioBytesCount;
 	double _audioNTP;
 	double _audioRTP;
-	double _lastAudioTs;
+	double _audioLastTs;
+	uint32_t _audioLastRTP;
+	uint32_t _audioRTPRollCount;
+	double _audioFirstTimestamp;
+	uint32_t _lastAudioRTCPRTP;
+	uint32_t _audioRTCPRTPRollCount;
 
 	bool _hasVideo;
 	IOBuffer _currentNalu;
 	uint16_t _videoSequence;
-	uint32_t _videoPacketsCount;
-	uint32_t _videoDroppedPacketsCount;
-	uint32_t _videoBytesCount;
+	uint64_t _videoPacketsCount;
+	uint64_t _videoDroppedPacketsCount;
+	uint64_t _videoBytesCount;
 	double _videoNTP;
 	double _videoRTP;
-	double _lastVideoTs;
+	double _videoLastTs;
+	uint32_t _videoLastRTP;
+	uint32_t _videoRTPRollCount;
+	double _videoFirstTimestamp;
+	uint32_t _lastVideoRTCPRTP;
+	uint32_t _videoRTCPRTPRollCount;
+
+	uint8_t _rtcpPresence;
+	uint8_t _rtcpDetectionInterval;
+	time_t _rtcpDetectionStart;
+
+	bool _avCodecsSent;
 public:
 	InNetRTPStream(BaseProtocol *pProtocol, StreamsManager *pStreamsManager,
-			string name, string SPS, string PPS, string AAC);
+			string name, string SPS, string PPS, string AAC,
+			uint32_t bandwidthHint, uint8_t rtcpDetectionInterval);
 	virtual ~InNetRTPStream();
 
 	virtual StreamCapabilities * GetCapabilities();
@@ -70,12 +91,14 @@ public:
 			RTPHeader &rtpHeader);
 	virtual bool FeedAudioData(uint8_t *pData, uint32_t dataLength,
 			RTPHeader &rtpHeader);
-	virtual void GetStats(Variant &info);
+	virtual void GetStats(Variant &info, uint32_t namespaceId = 0);
 
 	void ReportSR(uint64_t ntpMicroseconds, uint32_t rtpTimestamp, bool isAudio);
 private:
 	void FeedVideoCodecSetup(BaseOutStream *pOutStream);
 	void FeedAudioCodecSetup(BaseOutStream *pOutStream);
+	uint64_t ComputeRTP(uint32_t &currentRtp, uint32_t &lastRtp,
+			uint32_t &rtpRollCount);
 };
 
 #endif	/* _INNETRTPSTREAM_H */

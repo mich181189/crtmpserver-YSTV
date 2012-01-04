@@ -20,10 +20,6 @@ CONF_PROTOCOL_OUTBOUND_RTMPT="outboundRtmpt",
 CONF_PROTOCOL_OUTBOUND_RTMPE="outboundRtmpe",
 CONF_PROTOCOL_INBOUND_RTMPS="inboundRtmps",
 
--- RTMFP protocols
-CONF_PROTOCOL_INBOUND_RTMFP="inboundRtmfp",
-CONF_PROTOCOL_OUTBOUND_RTMFP="outboundRtmfp",
-
 -- Async DNS protocols
 CONF_PROTOCOL_INBOUND_DNS="inboundDns",
 CONF_PROTOCOL_OUTBOUND_DNS="outboundDns",
@@ -38,6 +34,7 @@ CONF_PROTOCOL_INBOUND_UDP_RTP="inboundUdpRtp",
 CONF_PROTOCOL_RTSP_RTCP="inboundRtspRtcp",
 CONF_PROTOCOL_UDP_RTCP="inboundUdpRtcp",
 CONF_PROTOCOL_INBOUND_RTSP="inboundRtsp",
+CONF_PROTOCOL_RTP_NAT_TRAVERSAL="rtpNatTraversal",
 
 -- HTTP protocols
 CONF_PROTOCOL_INBOUND_HTTP="inboundHttp",
@@ -86,6 +83,7 @@ CONF_APPLICATION_MEDIAFOLDER="mediaFolder",
 CONF_APPLICATION_KEYFRAMESEEK="keyframeSeek",
 CONF_APPLICATION_SEEKGRANULARITY="seekGranularity",
 CONF_APPLICATION_CLIENTSIDEBUFFER="clientSideBuffer",
+CONF_APPLICATION_RTCPDETECTIONINTERVAL="rtcpDetectionInterval",
 CONF_APPLICATION_VALIDATEHANDSHAKE="validateHandshake",
 CONF_APPLICATION_AUTH="authentication",
 CONF_APPLICATION_AUTH_TYPE="type",
@@ -94,6 +92,11 @@ CONF_APPLICATION_AUTH_ENCODER_AGENTS="encoderAgents",
 CONF_APPLICATION_AUTH_USERS_FILE="usersFile",
 CONF_APPLICATION_RENAMEBADFILES="renameBadFiles",
 CONF_APPLICATION_EXTERNSEEKGENERATOR="externSeekGenerator",
+CONF_APPLICATION_INIT_APPLICATION_FUNCTION="initApplicationFunction",
+CONF_APPLICATION_DELETE_APPLICATION_FUNCTION="deleteApplicationFunction",
+CONF_APPLICATION_INIT_FACTORY_FUNCTION="initFactoryFunction",
+CONF_APPLICATION_DELETE_FACTORY_FUNCTION="deleteFactoryFunction",
+CONF_APPLICATION_ALLOW_DUPLICATE_INBOUND_NETWORK_STREAMS="allowDuplicateInboundNetworkStreams",
 CONF_ADDRESS="address",
 CONF_CONFIGURATION="configuration",
 CONF_BIND_ADDRESSES="bindAddresses",
@@ -104,8 +107,16 @@ CONF_LOG_APPENDER_TYPE="type",
 CONF_LOG_APPENDER_TYPE_CONSOLE="console",
 CONF_LOG_APPENDER_TYPE_COLORED_CONSOLE="coloredConsole",
 CONF_LOG_APPENDER_TYPE_FILE="file",
+CONF_LOG_APPENDER_TYPE_SYSLOG="syslog",
 CONF_LOG_APPENDER_FILE_NAME="fileName",
 CONF_LOG_APPENDER_LEVEL="level",
+CONF_LOG_APPENDER_SPECIFIC_LEVEL="specificLevel",
+CONF_LOG_APPENDER_COLORED="colored",
+CONF_LOG_APPENDER_FORMAT="format",
+CONF_LOG_APPENDER_SINGLE_LINE="singleLine",
+CONF_LOG_APPENDER_NEW_LINE_CHARACTERS="newLineCharacters",
+CONF_LOG_APPENDER_FILE_HISTORY_SIZE="fileHistorySize",
+CONF_LOG_APPENDER_FILE_LENGTH="fileLength",
 
 MEDIA_TYPE_LIVE_OR_FLV="liveOrFlv",
 MEDIA_TYPE_FLV="flv",
@@ -217,6 +228,7 @@ META_SERVER_FILE_NAME="fileName",
 META_RTMP_META="rtmpMeta",
 META_FILE_SIZE="fileSize",
 META_FILE_DURATION="fileDuration",
+META_FILE_BANDWIDTH="bandwidth",
 META_AUDIO_FRAMES_COUNT="audioFramesCount",
 META_VIDEO_FRAMES_COUNT="videoFramesCount",
 META_TOTAL_FRAMES_COUNT="totalFrames",
@@ -299,6 +311,8 @@ RM="rtmpMessage",
 			RM_INVOKE_FUNCTION_FCSUBSCRIBE="FCSubscribe",
 			RM_INVOKE_FUNCTION_ONBWDONE="onBWDone",
 			RM_INVOKE_FUNCTION_GETSTREAMLENGTH="getStreamLength",
+			RM_INVOKE_FUNCTION_CHECKBANDWIDTH="checkBandwidth",
+			RM_INVOKE_FUNCTION_ONBWCHECK="onBWCheck",
 		RM_INVOKE_ID="id",
 		RM_INVOKE_PARAMS="parameters",
 
@@ -600,6 +614,7 @@ if arg[1]=="cs" then
 	file:write("namespace "..arg[3].."\r\n{\r\n")
 	file:write("public static class "..arg[4].."\r\n{\r\n")
 	for k,v in orderedPairs(constants) do
+		print (k,v)
 		if(type(v)=="string") then
 			file:write("public const string "..k.."=\""..v.."\";\n")
 		else
@@ -607,6 +622,7 @@ if arg[1]=="cs" then
 		end
 	end
 	file:write("}\r\n}\r\n")
+	file:close()
 end
 
 

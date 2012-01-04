@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -43,15 +43,19 @@ public:
 	TCPAcceptor(string ipAddress, uint16_t port, Variant parameters,
 			vector<uint64_t>/*&*/ protocolChain);
 	virtual ~TCPAcceptor();
-	bool StartAccept(BaseClientApplication *pApplication);
+	bool Bind();
+	void SetApplication(BaseClientApplication *pApplication);
+	bool StartAccept();
 	virtual bool SignalOutputData();
 	virtual bool OnEvent(select_event &event);
 	virtual bool OnConnectionAvailable(select_event &event);
+	bool Accept();
+	bool Drop();
 	Variant & GetParameters();
 	BaseClientApplication *GetApplication();
 	vector<uint64_t> &GetProtocolChain();
 	virtual operator string();
-	virtual void GetStats(Variant &info);
+	virtual void GetStats(Variant &info, uint32_t namespaceId = 0);
 	bool Enable();
 	void Enable(bool enabled);
 private:

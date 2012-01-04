@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -23,6 +23,7 @@
 
 #include "common.h"
 #include "netio/kqueue/iohandlermanagertoken.h"
+#include "netio/fdstats.h"
 
 class IOHandler;
 
@@ -39,6 +40,7 @@ private:
 	static struct kevent *_pPendingEvents;
 	static int32_t _pendingEventsCount;
 	static int32_t _eventsSize;
+	static FdStats _fdStats;
 #ifndef HAS_KQUEUE_TIMERS
 	static struct timespec _timeout;
 	static TimersManager *_pTimersManager;
@@ -53,12 +55,22 @@ private:
 public:
 	static map<uint32_t, IOHandler *> & GetActiveHandlers();
 	static map<uint32_t, IOHandler *> & GetDeadHandlers();
+	static FdStats &GetStats();
 	static void Initialize();
+	static void Start();
 	static void SignalShutdown();
 	static void ShutdownIOHandlers();
 	static void Shutdown();
 	static void RegisterIOHandler(IOHandler *pIOHandler);
 	static void UnRegisterIOHandler(IOHandler *pIOHandler);
+	static int CreateRawUDPSocket();
+	static void CloseRawUDPSocket(int socket);
+#ifdef GLOBALLY_ACCOUNT_BYTES
+	static void AddInBytesManaged(IOHandlerType type, uint64_t bytes);
+	static void AddOutBytesManaged(IOHandlerType type, uint64_t bytes);
+	static void AddInBytesRawUdp(uint64_t bytes);
+	static void AddOutBytesRawUdp(uint64_t bytes);
+#endif /* GLOBALLY_ACCOUNT_BYTES */
 	static bool EnableReadData(IOHandler *pIOHandler);
 	static bool DisableReadData(IOHandler *pIOHandler, bool ignoreError = false);
 	static bool EnableWriteData(IOHandler *pIOHandler);
@@ -74,6 +86,7 @@ private:
 #ifndef HAS_KQUEUE_TIMERS
 	static void ProcessTimer(TimerEvent &event);
 #endif
+	static inline void ResizeEvents();
 };
 
 

@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -34,6 +34,7 @@ struct kevent *IOHandlerManager::_pDetectedEvents = NULL;
 struct kevent *IOHandlerManager::_pPendingEvents = NULL;
 int32_t IOHandlerManager::_pendingEventsCount = 0;
 int32_t IOHandlerManager::_eventsSize = 0;
+FdStats IOHandlerManager::_fdStats;
 #ifndef HAS_KQUEUE_TIMERS
 struct timespec IOHandlerManager::_timeout = {1, 0};
 TimersManager *IOHandlerManager::_pTimersManager = NULL;
@@ -64,13 +65,7 @@ void IOHandlerManager::FreeToken(IOHandler *pIOHandler) {
 bool IOHandlerManager::RegisterEvent(int32_t fd, int16_t filter, uint16_t flags,
 		uint32_t fflags, uint32_t data, IOHandlerManagerToken *pToken, bool ignoreError) {
 	if (_pendingEventsCount >= _eventsSize) {
-		_eventsSize += INITIAL_EVENTS_SIZE;
-		_pPendingEvents = (struct kevent *) realloc(_pPendingEvents,
-				_eventsSize * sizeof (struct kevent));
-		_pDetectedEvents = (struct kevent *) realloc(_pDetectedEvents,
-				_eventsSize * sizeof (struct kevent));
-		WARN("Event size resized: %d->%d", _eventsSize - INITIAL_EVENTS_SIZE,
-				_eventsSize);
+		ResizeEvents();
 	}
 	EV_SET(&_pPendingEvents[_pendingEventsCount], fd, filter, flags, fflags,
 			data, pToken);
@@ -86,14 +81,24 @@ map<uint32_t, IOHandler *> & IOHandlerManager::GetDeadHandlers() {
 	return _deadIOHandlers;
 }
 
+FdStats &IOHandlerManager::GetStats() {
+	return _fdStats;
+}
+
 void IOHandlerManager::Initialize() {
-	_kq = kqueue();
-	assert(_kq > 0);
+	_fdStats.Reset();
+	_kq = 0;
 	_pAvailableTokens = &_tokensVector1;
 	_pRecycledTokens = &_tokensVector2;
 #ifndef HAS_KQUEUE_TIMERS
 	_pTimersManager = new TimersManager(ProcessTimer);
 #endif
+	ResizeEvents();
+}
+
+void IOHandlerManager::Start() {
+	_kq = kqueue();
+	assert(_kq > 0);
 }
 
 void IOHandlerManager::SignalShutdown() {
@@ -144,12 +149,14 @@ void IOHandlerManager::RegisterIOHandler(IOHandler* pIOHandler) {
 	size_t before = _activeIOHandlers.size();
 	_activeIOHandlers[pIOHandler->GetId()] = pIOHandler;
 	SetupToken(pIOHandler);
+	_fdStats.RegisterManaged(pIOHandler->GetType());
 	DEBUG("Handlers count changed: %"PRIz"u->%"PRIz"u %s", before, before + 1,
 			STR(IOHandler::IOHTToString(pIOHandler->GetType())));
 }
 
 void IOHandlerManager::UnRegisterIOHandler(IOHandler *pIOHandler) {
 	if (MAP_HAS1(_activeIOHandlers, pIOHandler->GetId())) {
+		_fdStats.UnRegisterManaged(pIOHandler->GetType());
 		FreeToken(pIOHandler);
 		size_t before = _activeIOHandlers.size();
 		_activeIOHandlers.erase(pIOHandler->GetId());
@@ -157,6 +164,42 @@ void IOHandlerManager::UnRegisterIOHandler(IOHandler *pIOHandler) {
 				STR(IOHandler::IOHTToString(pIOHandler->GetType())));
 	}
 }
+
+int IOHandlerManager::CreateRawUDPSocket() {
+	int result = socket(AF_INET, SOCK_DGRAM, 0);
+	if (result >= 0) {
+		_fdStats.RegisterRawUdp();
+	} else {
+		uint32_t err = LASTSOCKETERROR;
+		FATAL("Unable to create raw udp socket. Error code was: %"PRIu32, err);
+	}
+	return result;
+}
+
+void IOHandlerManager::CloseRawUDPSocket(int socket) {
+	if (socket > 0) {
+		_fdStats.UnRegisterRawUdp();
+	}
+	CLOSE_SOCKET(socket);
+}
+#ifdef GLOBALLY_ACCOUNT_BYTES
+
+void IOHandlerManager::AddInBytesManaged(IOHandlerType type, uint64_t bytes) {
+	_fdStats.AddInBytesManaged(type, bytes);
+}
+
+void IOHandlerManager::AddOutBytesManaged(IOHandlerType type, uint64_t bytes) {
+	_fdStats.AddOutBytesManaged(type, bytes);
+}
+
+void IOHandlerManager::AddInBytesRawUdp(uint64_t bytes) {
+	_fdStats.AddInBytesRawUdp(bytes);
+}
+
+void IOHandlerManager::AddOutBytesRawUdp(uint64_t bytes) {
+	_fdStats.AddOutBytesRawUdp(bytes);
+}
+#endif /* GLOBALLY_ACCOUNT_BYTES */
 
 bool IOHandlerManager::EnableReadData(IOHandler *pIOHandler) {
 	return RegisterEvent(pIOHandler->GetInboundFd(), EVFILT_READ,
@@ -307,7 +350,17 @@ void IOHandlerManager::ProcessTimer(TimerEvent &event) {
 		FATAL("Invalid token");
 	}
 }
-#endif
+#endif /* HAS_KQUEUE_TIMERS */
+
+inline void IOHandlerManager::ResizeEvents() {
+	_eventsSize += INITIAL_EVENTS_SIZE;
+	_pPendingEvents = (struct kevent *) realloc(_pPendingEvents,
+			_eventsSize * sizeof (struct kevent));
+	_pDetectedEvents = (struct kevent *) realloc(_pDetectedEvents,
+			_eventsSize * sizeof (struct kevent));
+	WARN("Event size resized: %d->%d", _eventsSize - INITIAL_EVENTS_SIZE,
+			_eventsSize);
+}
 
 #endif /* NET_KQUEUE */
 

@@ -52,7 +52,6 @@ struct RunningStatus {
 };
 
 void QuitSignalHandler(void);
-void ConfRereadSignalHandler(void);
 bool Initialize();
 void Run();
 void Cleanup();
@@ -60,11 +59,13 @@ void PrintHelp();
 void PrintVersion();
 void NormalizeCommandLine(string configFile);
 bool ApplyUIDGID();
+void WritePidFile(pid_t pid);
 
 RunningStatus gRs;
 
 #ifdef COMPILE_STATIC
 BaseClientApplication *SpawnApplication(Variant configuration);
+BaseProtocolFactory *SpawnFactory(Variant configuration);
 #endif
 
 int main(int argc, char **argv) {
@@ -73,7 +74,7 @@ int main(int argc, char **argv) {
 
 	//1. Pick up the startup parameters and hold them inside the running status
 	if (argc < 2) {
-		cout << "Invalid command line. Use --help" << endl;
+		fprintf(stdout, "Invalid command line. Use --help\n");
 		return -1;
 	}
 
@@ -119,16 +120,21 @@ bool Initialize() {
 	Logger::Init();
 
 	if ((bool)gRs.commandLine["arguments"]["--use-implicit-console-appender"]) {
-		ConsoleLogLocation * pLogLocation = new ConsoleLogLocation(false);
+		Variant dummy;
+		dummy[CONF_LOG_APPENDER_NAME] = "implicit console appender";
+		dummy[CONF_LOG_APPENDER_TYPE] = CONF_LOG_APPENDER_TYPE_CONSOLE;
+		dummy[CONF_LOG_APPENDER_COLORED] = (bool)true;
+		dummy[CONF_LOG_APPENDER_LEVEL] = (uint32_t) 6;
+		ConsoleLogLocation * pLogLocation = new ConsoleLogLocation(dummy);
 		pLogLocation->SetLevel(_FINEST_);
 		Logger::AddLogLocation(pLogLocation);
 	}
 
 	INFO("Reading configuration from %s", STR(gRs.commandLine["arguments"]["configFile"]));
 #ifdef COMPILE_STATIC
-	gRs.pConfigFile = new ConfigFile(SpawnApplication);
+	gRs.pConfigFile = new ConfigFile(SpawnApplication, SpawnFactory);
 #else
-	gRs.pConfigFile = new ConfigFile(NULL);
+	gRs.pConfigFile = new ConfigFile(NULL, NULL);
 #endif
 	string configFilePath = gRs.commandLine["arguments"]["configFile"];
 	string fileName;
@@ -149,7 +155,7 @@ bool Initialize() {
 			return false;
 		}
 #else
-		cout << "Lua is not supported by the current build of the server" << endl;
+		fprintf(stdout, "Lua is not supported by the current build of the server\n");
 		ASSERT("Lua is not supported by the current build of the server");
 		return false;
 #endif /* HAS_LUA */
@@ -169,6 +175,8 @@ bool Initialize() {
 			}
 
 			if (pid > 0) {
+				if (gRs.commandLine["arguments"].HasKey("--pid"))
+					WritePidFile(pid);
 				return false;
 			}
 
@@ -180,13 +188,25 @@ bool Initialize() {
 			}
 
 			gRs.daemon = true;
+
+			Logger::SignalFork();
 		}
 	}
 #endif /* WIN32 */
 
-	INFO("Configure log appenders from configuration file");
-	if (!gRs.pConfigFile->ConfigureLogAppenders()) {
-		WARN("Unable to configure log appenders");
+	INFO("Configure logger");
+	if (!gRs.pConfigFile->ConfigLogAppenders()) {
+		FATAL("Unable to configure log appenders");
+		return false;
+	}
+
+	INFO("Initialize I/O handlers manager: %s", NETWORK_REACTOR);
+	IOHandlerManager::Initialize();
+
+	INFO("Configure modules");
+	if (!gRs.pConfigFile->ConfigModules()) {
+		FATAL("Unable to configure modules");
+		return false;
 	}
 
 	INFO("Plug in the default protocol factory");
@@ -196,28 +216,35 @@ bool Initialize() {
 		return false;
 	}
 
-	INFO("Initialize I/O handlers manager: %s", NETWORK_REACTOR);
-	IOHandlerManager::Initialize();
-
-#ifdef  HAS_PROTOCOL_DNS 
-	INFO("Initialize DNS resolver");
-	if (!gRs.pConfigFile->ConfigureDNSResolver()) {
-		FATAL("Unable to configure DNS resolver");
+	INFO("Configure factories");
+	if (!gRs.pConfigFile->ConfigFactories()) {
+		FATAL("Unable to configure factories");
 		return false;
 	}
-#endif /* HAS_PROTOCOL_DNS */
 
-	INFO("Initialize applications");
-	if (!gRs.pConfigFile->ConfigureApplications()) {
+	INFO("Configure acceptors");
+	if (!gRs.pConfigFile->ConfigAcceptors()) {
+		FATAL("Unable to configure acceptors");
+		return false;
+	}
+
+	INFO("Configure instances");
+	if (!gRs.pConfigFile->ConfigInstances()) {
+		FATAL("Unable to configure instances");
+		return false;
+	}
+
+	INFO("Start I/O handlers manager: %s", NETWORK_REACTOR);
+	IOHandlerManager::Start();
+
+	INFO("Configure applications");
+	if (!gRs.pConfigFile->ConfigApplications()) {
 		FATAL("Unable to configure applications");
 		return false;
 	}
 
 	INFO("Install the quit signal");
 	installQuitSignal(QuitSignalHandler);
-
-	INFO("Install the conf re-read signal");
-	installConfRereadSignal(ConfRereadSignalHandler);
 
 	return true;
 }
@@ -268,36 +295,34 @@ void QuitSignalHandler(void) {
 	IOHandlerManager::SignalShutdown();
 }
 
-void ConfRereadSignalHandler(void) {
-	gRs.run = true;
-	IOHandlerManager::SignalShutdown();
-}
-
 void PrintHelp() {
-	cout << "Usage: \n" << (string) gRs.commandLine["program"] << " [OPTIONS] [config_file_path]" << endl << endl;
-	cout << "OPTIONS:" << endl;
-	cout << "    --help" << endl;
-	cout << "      Prints this help and exit\n" << endl;
-	cout << "    --version" << endl;
-	cout << "      Prints the version and exit.\n" << endl;
-	cout << "    --use-implicit-console-appender" << endl;
-	cout << "      Adds a console log appender." << endl;
-	cout << "      Particulary useful when the server starts and stops immediatly." << endl;
-	cout << "      Allows you to see if something is wrong with the config file\n" << endl;
-	cout << "    --daemon" << endl;
-	cout << "      Overrides the daemon setting inside the config file and forces" << endl;
-	cout << "      the server to start in daemon mode.\n" << endl;
-	cout << "    --uid=<uid>" << endl;
-	cout << "      Run the process with the specified user id\n" << endl;
-	cout << "    --gid=<gid>" << endl;
-	cout << "      Run the process with the specified group id\n" << endl;
+	fprintf(stdout, "Usage: \n%s [OPTIONS] [config_file_path]\n\n", STR(gRs.commandLine["program"]));
+	fprintf(stdout, "OPTIONS:\n");
+	fprintf(stdout, "    --help\n");
+	fprintf(stdout, "      Prints this help and exit\n\n");
+	fprintf(stdout, "    --version\n");
+	fprintf(stdout, "      Prints the version and exit.\n\n");
+	fprintf(stdout, "    --use-implicit-console-appender\n");
+	fprintf(stdout, "      Adds a console log appender.\n");
+	fprintf(stdout, "      Particularly useful when the server starts and then stops immediately.\n");
+	fprintf(stdout, "      Allows you to see if something is wrong with the config file\n\n");
+	fprintf(stdout, "    --daemon\n");
+	fprintf(stdout, "      Overrides the daemon setting inside the config file and forces\n");
+	fprintf(stdout, "      the server to start in daemon mode.\n\n");
+	fprintf(stdout, "    --uid=<uid>\n");
+	fprintf(stdout, "      Run the process with the specified user id\n\n");
+	fprintf(stdout, "    --gid=<gid>\n");
+	fprintf(stdout, "      Run the process with the specified group id\n\n");
+	fprintf(stdout, "    --pid=<pid_file>\n");
+	fprintf(stdout, "      Create PID file.\n");
+	fprintf(stdout, "      Works only if --daemon option is specified\n\n");
 }
 
 void PrintVersion() {
 #ifndef RTMPSERVER_VERSION
 #define RTMPSERVER_VERSION "(version not available)"
 #endif
-	cout << HTTP_HEADERS_SERVER_US << " version " << RTMPSERVER_VERSION << endl;
+	fprintf(stdout, HTTP_HEADERS_SERVER_US" version "RTMPSERVER_VERSION"\n");
 }
 
 void NormalizeCommandLine(string configFile) {
@@ -341,6 +366,33 @@ bool ApplyUIDGID() {
 	return true;
 }
 
+void WritePidFile(pid_t pid) {
+	/*!
+	 * rewrite PID file if it already exists
+	 */
+	string pidFile = gRs.commandLine["arguments"]["--pid"];
+	struct stat sb;
+	if (stat(STR(pidFile), &sb) == 0) {
+		WARN("pid file %s already exists\n", STR(pidFile));
+	} else if (errno != ENOENT) {
+		WARN("stat: %s", strerror(errno));
+		return;
+	}
+
+	File f;
+	if (!f.Initialize(STR(pidFile), FILE_OPEN_MODE_TRUNCATE)) {
+		WARN("Unable to open PID file %s", STR(pidFile));
+		return;
+	}
+
+	string content = format("%"PRIz"d", pid);
+	if (!f.WriteString(content)) {
+		WARN("Unable to write PID to file %s", STR(pidFile));
+		return;
+	}
+	f.Close();
+}
+
 #ifdef COMPILE_STATIC
 #ifdef HAS_APP_ADMIN
 extern "C" BaseClientApplication *GetApplication_admin(Variant configuration);
@@ -359,6 +411,7 @@ extern "C" BaseClientApplication *GetApplication_proxypublish(Variant configurat
 #endif
 #ifdef HAS_APP_SAMPLEFACTORY
 extern "C" BaseClientApplication *GetApplication_samplefactory(Variant configuration);
+extern "C" BaseProtocolFactory *GetFactory_samplefactory(Variant configuration);
 #endif
 #ifdef HAS_APP_STRESSTEST
 extern "C" BaseClientApplication *GetApplication_stresstest(Variant configuration);
@@ -417,6 +470,20 @@ BaseClientApplication *SpawnApplication(Variant configuration) {
 #ifdef HAS_APP_VMAPP
 	else if (configuration[CONF_APPLICATION_NAME] == "vmapp") {
 		return GetApplication_vmapp(configuration);
+	}
+#endif
+	else {
+		return NULL;
+	}
+}
+
+BaseProtocolFactory *SpawnFactory(Variant configuration) {
+	if (false) {
+
+	}
+#ifdef HAS_APP_SAMPLEFACTORY
+	else if (configuration[CONF_APPLICATION_NAME] == "samplefactory") {
+		return GetFactory_samplefactory(configuration);
 	}
 #endif
 	else {

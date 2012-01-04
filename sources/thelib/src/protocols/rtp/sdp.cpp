@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -115,6 +115,10 @@ Variant SDP::GetVideoTrack(uint32_t index, string uri) {
 			.GetValue("sprop-parameter-sets", false)["PPS"];
 	SDP_TRACK_GLOBAL_INDEX(result) = SDP_TRACK_GLOBAL_INDEX(track);
 	SDP_TRACK_IS_AUDIO(result) = (bool)false;
+	if (track.HasKeyChain(V_UINT32, false, 1, SDP_B))
+		SDP_TRACK_BANDWIDTH(result) = track[SDP_B];
+	else
+		SDP_TRACK_BANDWIDTH(result) = (uint32_t) 0;
 
 	//3. Done
 	return result;
@@ -147,9 +151,20 @@ Variant SDP::GetAudioTrack(uint32_t index, string uri) {
 			.GetValue("config", false);
 	SDP_TRACK_GLOBAL_INDEX(result) = SDP_TRACK_GLOBAL_INDEX(track);
 	SDP_TRACK_IS_AUDIO(result) = (bool)true;
+	if (track.HasKeyChain(V_UINT32, false, 1, SDP_B))
+		SDP_TRACK_BANDWIDTH(result) = track[SDP_B];
+	else
+		SDP_TRACK_BANDWIDTH(result) = (uint32_t) 0;
 
 	//3. Done
 	return result;
+}
+
+uint32_t SDP::GetTotalBandwidth() {
+	if (HasKeyChain(V_UINT32, false, 2, SDP_SESSION, SDP_B))
+		return (uint32_t) ((*this)[SDP_SESSION][SDP_B]);
+	else
+		return 0;
 }
 
 string SDP::GetStreamName() {
@@ -158,6 +173,72 @@ string SDP::GetStreamName() {
 	if (!(*this)[SDP_SESSION].HasKey(SDP_S))
 		return "";
 	return (string) (*this)[SDP_SESSION][SDP_S];
+}
+
+bool SDP::ParseTransportLine(string raw, Variant &result) {
+	result.Reset();
+
+	//1. split after ';'
+	vector<string> parts;
+	split(raw, ";", parts);
+
+	//2. Construct the result
+	for (uint32_t i = 0; i < parts.size(); i++) {
+		string part = parts[i];
+		trim(part);
+		if (part == "")
+			continue;
+		string::size_type pos = part.find('=');
+		if (pos == string::npos) {
+			result[lowerCase(part)] = (bool)true;
+			continue;
+		}
+		result[lowerCase(part.substr(0, pos))] = part.substr(pos + 1);
+	}
+
+	vector<string> keys;
+	ADD_VECTOR_END(keys, "client_port");
+	ADD_VECTOR_END(keys, "server_port");
+	ADD_VECTOR_END(keys, "interleaved");
+
+	for (uint32_t i = 0; i < keys.size(); i++) {
+		string key = keys[i];
+		if (!result.HasKey(key))
+			continue;
+		parts.clear();
+		raw = (string) result[key];
+		split(raw, "-", parts);
+		if ((parts.size() != 2) && (parts.size() != 1)) {
+			FATAL("Invalid transport line: %s", STR(raw));
+			return false;
+		}
+		string all = "";
+		uint16_t data = 0;
+		uint16_t rtcp = 0;
+		if (parts.size() == 2) {
+			data = atoi(STR(parts[0]));
+			rtcp = atoi(STR(parts[1]));
+			if (((data % 2) != 0) || ((data + 1) != rtcp)) {
+				FATAL("Invalid transport line: %s", STR(raw));
+				return false;
+			}
+			all = format("%"PRIu16"-%"PRIu16, data, rtcp);
+		} else {
+			data = atoi(STR(parts[0]));
+			all = format("%"PRIu16, data);
+			rtcp = 0;
+		}
+		if (all != raw) {
+			FATAL("Invalid transport line: %s", STR(raw));
+			return false;
+		}
+		result.RemoveKey(key);
+		result[key]["data"] = (uint16_t) data;
+		result[key]["rtcp"] = (uint16_t) rtcp;
+		result[key]["all"] = all;
+	}
+
+	return true;
 }
 
 bool SDP::ParseSection(Variant &result, vector<string> &lines,
@@ -207,11 +288,8 @@ bool SDP::ParseSDPLine(Variant &result, string &line) {
 		}
 		case 'b':
 		{
-			Variant node;
-			if (!ParseSDPLineB(node, line.substr(2)))
-				return false;
-			result[SDP_B].PushToArray(node);
-			return true;
+			FORBID_DUPLICATE(SDP_B);
+			return ParseSDPLineB(result[SDP_B], line.substr(2));
 		}
 		case 'c':
 		{
@@ -332,7 +410,7 @@ bool SDP::ParseSDPLineA(string &attributeName, Variant &value, string line) {
 		} else if ((string) lowerCase(value["encodingName"]) == "mpeg4-generic") {
 			value["encodingName"] = (uint64_t) CODEC_AUDIO_AAC;
 		} else {
-			WARN("Invalid codec");
+			WARN("Invalid codec: %s", STR(value["encodingName"]));
 			value.Reset();
 			return true;
 		}
@@ -374,6 +452,14 @@ bool SDP::ParseSDPLineB(Variant &result, string line) {
 
 	result["modifier"] = parts[0];
 	result["value"] = parts[1];
+
+	if (parts[0] == "AS") {
+		uint32_t val = (uint32_t) atoi(STR(parts[1]));
+		result = (uint32_t) val;
+	} else {
+		WARN("Bandwidth modifier %s not implemented", STR(result["modifier"]));
+		result = (uint32_t) 0;
+	}
 
 	return true;
 }

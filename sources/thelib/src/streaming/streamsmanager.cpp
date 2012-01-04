@@ -75,6 +75,12 @@ void StreamsManager::UnRegisterStreams(uint32_t protocolId) {
 	}
 }
 
+bool StreamsManager::StreamNameAvailable(string streamName) {
+	if (_pApplication->GetAllowDuplicateInboundNetworkStreams())
+		return true;
+	return FindByTypeByName(ST_IN_NET, streamName, true, false).size() == 0;
+}
+
 map<uint32_t, BaseStream *> StreamsManager::GetAllStreams() {
 	return _streamsByUniqueId;
 }
@@ -88,7 +94,7 @@ map<uint32_t, BaseOutStream *> StreamsManager::GetWaitingSubscribers(string stre
 	vector<string> parts;
 	split(streamName, "?", parts);
 	string shortName = parts[0];
-	FINEST("short name: %s; long name: %s", STR(shortName), STR(streamName));
+	//FINEST("short name: %s; long name: %s", STR(shortName), STR(streamName));
 
 	//2. get the 2 kinds of subscribers
 	map<uint32_t, BaseStream *> shortSubscribers;
@@ -96,8 +102,8 @@ map<uint32_t, BaseOutStream *> StreamsManager::GetWaitingSubscribers(string stre
 	shortSubscribers = FindByTypeByName(ST_OUT, shortName, true, false);
 	longSubscribers = FindByTypeByName(ST_OUT, streamName, true, false);
 
-	FINEST("short count: %"PRIz"u; long count: %"PRIz"u",
-			shortSubscribers.size(), longSubscribers.size());
+	//	FINEST("short count: %"PRIz"u; long count: %"PRIz"u",
+	//			shortSubscribers.size(), longSubscribers.size());
 
 	//3. merge them
 	map<uint32_t, BaseOutStream *> result;

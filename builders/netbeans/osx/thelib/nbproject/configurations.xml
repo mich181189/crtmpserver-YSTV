@@ -13,6 +13,7 @@
                      displayName="configuration"
                      projectFiles="true">
         <itemPath>../../../../sources/thelib/include/configuration/configfile.h</itemPath>
+        <itemPath>../../../../sources/thelib/include/configuration/module.h</itemPath>
       </logicalFolder>
       <logicalFolder name="mediaformats"
                      displayName="mediaformats"
@@ -134,6 +135,7 @@
         <logicalFolder name="http" displayName="http" projectFiles="true">
           <itemPath>../../../../sources/thelib/include/protocols/http/basehttpprotocol.h</itemPath>
           <itemPath>../../../../sources/thelib/include/protocols/http/basehttpprotocolhandler.h</itemPath>
+          <itemPath>../../../../sources/thelib/include/protocols/http/httpauthhelper.h</itemPath>
           <itemPath>../../../../sources/thelib/include/protocols/http/inboundhttpprotocol.h</itemPath>
           <itemPath>../../../../sources/thelib/include/protocols/http/outboundhttpprotocol.h</itemPath>
         </logicalFolder>
@@ -200,6 +202,7 @@
           <itemPath>../../../../sources/thelib/include/protocols/rtmp/inboundhttp4rtmp.h</itemPath>
           <itemPath>../../../../sources/thelib/include/protocols/rtmp/inboundrtmpprotocol.h</itemPath>
           <itemPath>../../../../sources/thelib/include/protocols/rtmp/inboundrtmpsdiscriminatorprotocol.h</itemPath>
+          <itemPath>../../../../sources/thelib/include/protocols/rtmp/monitorrtmpprotocol.h</itemPath>
           <itemPath>../../../../sources/thelib/include/protocols/rtmp/outboundrtmpprotocol.h</itemPath>
           <itemPath>../../../../sources/thelib/include/protocols/rtmp/rtmpeprotocol.h</itemPath>
           <itemPath>../../../../sources/thelib/include/protocols/rtmp/rtmpprotocolserializer.h</itemPath>
@@ -289,6 +292,7 @@
                      displayName="configuration"
                      projectFiles="true">
         <itemPath>../../../../sources/thelib/src/configuration/configfile.cpp</itemPath>
+        <itemPath>../../../../sources/thelib/src/configuration/module.cpp</itemPath>
       </logicalFolder>
       <logicalFolder name="mediaformats"
                      displayName="mediaformats"
@@ -404,6 +408,7 @@
         <logicalFolder name="http" displayName="http" projectFiles="true">
           <itemPath>../../../../sources/thelib/src/protocols/http/basehttpappprotocolhandler.cpp</itemPath>
           <itemPath>../../../../sources/thelib/src/protocols/http/basehttpprotocol.cpp</itemPath>
+          <itemPath>../../../../sources/thelib/src/protocols/http/httpauthhelper.cpp</itemPath>
           <itemPath>../../../../sources/thelib/src/protocols/http/inboundhttpprotocol.cpp</itemPath>
           <itemPath>../../../../sources/thelib/src/protocols/http/outboundhttpprotocol.cpp</itemPath>
         </logicalFolder>
@@ -466,6 +471,7 @@
           <itemPath>../../../../sources/thelib/src/protocols/rtmp/inboundhttp4rtmp.cpp</itemPath>
           <itemPath>../../../../sources/thelib/src/protocols/rtmp/inboundrtmpprotocol.cpp</itemPath>
           <itemPath>../../../../sources/thelib/src/protocols/rtmp/inboundrtmpsdiscriminatorprotocol.cpp</itemPath>
+          <itemPath>../../../../sources/thelib/src/protocols/rtmp/monitorrtmpprotocol.cpp</itemPath>
           <itemPath>../../../../sources/thelib/src/protocols/rtmp/outboundrtmpprotocol.cpp</itemPath>
           <itemPath>../../../../sources/thelib/src/protocols/rtmp/rtmpeprotocol.cpp</itemPath>
           <itemPath>../../../../sources/thelib/src/protocols/rtmp/rtmpprotocolserializer.cpp</itemPath>
@@ -573,27 +579,29 @@
             <pElem>../../../../../ffmpeg_bin/include</pElem>
           </incDir>
           <preprocessorList>
-            <Elem>OSX</Elem>
-            <Elem>NET_KQUEUE</Elem>
-            <Elem>LITTLE_ENDIAN_BYTE_ALIGNED</Elem>
-            <Elem>HAS_PROTOCOL_RTMP</Elem>
-            <Elem>HAS_PROTOCOL_HTTP</Elem>
-            <Elem>HAS_PROTOCOL_TS</Elem>
-            <Elem>HAS_PROTOCOL_RTP</Elem>
-            <Elem>HAS_PROTOCOL_VAR</Elem>
-            <Elem>HAS_PROTOCOL_LIVEFLV</Elem>
-            <Elem>HAS_MEDIA_MP4</Elem>
-            <Elem>HAS_MEDIA_MP3</Elem>
-            <Elem>HAS_MEDIA_FLV</Elem>
-            <Elem>HAS_MEDIA_MKV</Elem>
             <Elem>CreateRTCPPacket=CreateRTCPPacket_none</Elem>
             <Elem>FeedDataAudioMPEG4Generic=FeedDataAudioMPEG4Generic_one_by_one</Elem>
+            <Elem>HAS_LUA</Elem>
+            <Elem>HAS_MEDIA_FLV</Elem>
             <Elem>HAS_MEDIA_MKV</Elem>
-            <Elem>HAS_PROTOCOL_CLI</Elem>
-            <Elem>HAS_PROTOCOL_RTMFP</Elem>
+            <Elem>HAS_MEDIA_MKV</Elem>
+            <Elem>HAS_MEDIA_MP3</Elem>
+            <Elem>HAS_MEDIA_MP4</Elem>
             <Elem>HAS_MEDIA_NSV</Elem>
+            <Elem>HAS_PROTOCOL_CLI</Elem>
+            <Elem>HAS_PROTOCOL_HTTP</Elem>
+            <Elem>HAS_PROTOCOL_LIVEFLV</Elem>
             <Elem>HAS_PROTOCOL_MMS</Elem>
             <Elem>HAS_PROTOCOL_RAWHTTPSTREAM</Elem>
+            <Elem>HAS_PROTOCOL_RTMFP</Elem>
+            <Elem>HAS_PROTOCOL_RTMP</Elem>
+            <Elem>HAS_PROTOCOL_RTP</Elem>
+            <Elem>HAS_PROTOCOL_TS</Elem>
+            <Elem>HAS_PROTOCOL_VAR</Elem>
+            <Elem>HAS_SYSLOG</Elem>
+            <Elem>LITTLE_ENDIAN_BYTE_ALIGNED</Elem>
+            <Elem>NET_KQUEUE</Elem>
+            <Elem>OSX</Elem>
           </preprocessorList>
         </ccTool>
         <linkerTool>
@@ -633,18 +641,18 @@
             <pElem>../../../../sources/thelib/include</pElem>
           </incDir>
           <preprocessorList>
-            <Elem>OSX</Elem>
-            <Elem>NET_KQUEUE</Elem>
-            <Elem>LITTLE_ENDIAN_BYTE_ALIGNED</Elem>
-            <Elem>HAS_PROTOCOL_RTMP</Elem>
-            <Elem>HAS_PROTOCOL_HTTP</Elem>
-            <Elem>HAS_PROTOCOL_TS</Elem>
-            <Elem>HAS_PROTOCOL_RTP</Elem>
-            <Elem>HAS_PROTOCOL_VAR</Elem>
-            <Elem>HAS_PROTOCOL_LIVEFLV</Elem>
-            <Elem>HAS_MEDIA_MP4</Elem>
-            <Elem>HAS_MEDIA_MP3</Elem>
             <Elem>HAS_MEDIA_FLV</Elem>
+            <Elem>HAS_MEDIA_MP3</Elem>
+            <Elem>HAS_MEDIA_MP4</Elem>
+            <Elem>HAS_PROTOCOL_HTTP</Elem>
+            <Elem>HAS_PROTOCOL_LIVEFLV</Elem>
+            <Elem>HAS_PROTOCOL_RTMP</Elem>
+            <Elem>HAS_PROTOCOL_RTP</Elem>
+            <Elem>HAS_PROTOCOL_TS</Elem>
+            <Elem>HAS_PROTOCOL_VAR</Elem>
+            <Elem>LITTLE_ENDIAN_BYTE_ALIGNED</Elem>
+            <Elem>NET_KQUEUE</Elem>
+            <Elem>OSX</Elem>
           </preprocessorList>
         </ccTool>
         <fortranCompilerTool>

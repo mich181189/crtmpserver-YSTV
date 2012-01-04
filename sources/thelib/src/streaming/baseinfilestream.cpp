@@ -84,6 +84,8 @@ BaseInFileStream::BaseInFileStream(BaseProtocol *pProtocol,
 	_timeToIndexOffset = 0;
 
 	_streamCapabilities.Clear();
+
+	_playLimit = -1;
 }
 
 BaseInFileStream::~BaseInFileStream() {
@@ -196,7 +198,9 @@ bool BaseInFileStream::Initialize(int32_t clientSideBufferLength) {
 		return false;
 	}
 	if (!StreamCapabilities::Deserialize(raw, _streamCapabilities)) {
-		FATAL("Unable to deserialize stream Capabilities");
+		FATAL("Unable to deserialize stream Capabilities. Please delete %s and %s files so they can be regenerated",
+				STR(GetName() + "."MEDIA_TYPE_SEEK),
+				STR(GetName() + "."MEDIA_TYPE_META));
 		return false;
 	}
 
@@ -256,6 +260,8 @@ bool BaseInFileStream::Initialize(int32_t clientSideBufferLength) {
 bool BaseInFileStream::SignalPlay(double &absoluteTimestamp, double &length) {
 	//0. fix absoluteTimestamp and length
 	absoluteTimestamp = absoluteTimestamp < 0 ? 0 : absoluteTimestamp;
+	_playLimit = length;
+	//FINEST("absoluteTimestamp: %.2f; _playLimit: %.2f", absoluteTimestamp, _playLimit);
 	//TODO: implement the limit playback
 
 	//1. Seek to the correct point
@@ -423,6 +429,16 @@ bool BaseInFileStream::Feed() {
 		return true;
 	}
 
+	//FINEST("_totalSentTime: %.2f; _playLimit: %.2f", (double) _totalSentTime, _playLimit);
+	if (_playLimit >= 0) {
+		if (_playLimit < (double) _totalSentTime) {
+			FINEST("Done streaming file");
+			_pOutStreams->info->SignalStreamCompleted();
+			_paused = true;
+			return true;
+		}
+	}
+
 	//4. Read the current frame from the seeking file
 	if (!_pSeekFile->SeekTo(_framesBaseOffset + _currentFrameIndex * sizeof (MediaFrame))) {
 		FATAL("Unablt to seek inside seek file");
@@ -491,7 +507,7 @@ MmapFile* BaseInFileStream::GetFile(string filePath, uint32_t windowSize) {
 		windowSize = 131072;
 	MmapFile *pResult = NULL;
 	pResult = new MmapFile();
-	if (!pResult->Initialize(filePath, windowSize, true)) {
+	if (!pResult->Initialize(filePath, windowSize, false)) {
 		delete pResult;
 		return NULL;
 	}

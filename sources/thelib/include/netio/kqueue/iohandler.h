@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -23,16 +23,7 @@
 
 #include "common.h"
 #include "netio/kqueue/iohandlermanagertoken.h"
-
-typedef enum _IOHandlerType {
-	IOHT_ACCEPTOR,
-	IOHT_TCP_CONNECTOR,
-	IOHT_TCP_CARRIER,
-	IOHT_UDP_CARRIER,
-	IOHT_INBOUNDNAMEDPIPE_CARRIER,
-	IOHT_TIMER,
-	IOHT_STDIO
-} IOHandlerType;
+#include "netio/iohandlertype.h"
 
 class BaseProtocol;
 
@@ -43,8 +34,8 @@ protected:
 	int32_t _inboundFd;
 	int32_t _outboundFd;
 	BaseProtocol *_pProtocol;
-private:
 	IOHandlerType _type;
+private:
 	IOHandlerManagerToken *_pToken;
 public:
 	IOHandler(int32_t inboundFd, int32_t outboundFd, IOHandlerType type);
@@ -61,7 +52,7 @@ public:
 	virtual bool OnEvent(struct kevent &event) = 0;
 	static string IOHTToString(IOHandlerType type);
 	virtual operator string() = 0;
-	virtual void GetStats(Variant &info) = 0;
+	virtual void GetStats(Variant &info, uint32_t namespaceId = 0) = 0;
 };
 
 

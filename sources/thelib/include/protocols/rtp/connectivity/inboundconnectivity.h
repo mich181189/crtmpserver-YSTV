@@ -37,9 +37,12 @@ private:
 	InboundRTPProtocol *_pRTPVideo;
 	RTCPProtocol *_pRTCPVideo;
 	uint8_t _videoRR[60];
+	Variant _videoTrack;
+
 	InboundRTPProtocol *_pRTPAudio;
 	RTCPProtocol *_pRTCPAudio;
 	uint8_t _audioRR[60];
+	Variant _audioTrack;
 
 	InNetRTPStream *_pInStream;
 
@@ -48,15 +51,20 @@ private:
 	sockaddr_in _dummyAddress;
 
 	bool _forceTcp;
+	string _streamName;
+	uint32_t _bandwidthHint;
+
+	uint8_t _rtcpDetectionInterval;
 public:
-	InboundConnectivity(RTSPProtocol *pRTSP);
+	InboundConnectivity(RTSPProtocol *pRTSP, string streamName,
+			uint32_t bandwidthHint, uint8_t rtcpDetectionInterval);
 	virtual ~InboundConnectivity();
 	void EnqueueForDelete();
 
-	bool Initialize(Variant &videoTrack, Variant &audioTrack,
-			string streamName, bool forceTcp);
+	bool AddTrack(Variant &track, bool isAudio);
+	bool Initialize();
 
-	string GetTransportHeaderLine(bool isAudio);
+	string GetTransportHeaderLine(bool isAudio, bool isClient);
 
 	bool FeedData(uint32_t channelId, uint8_t *pBuffer, uint32_t bufferLength);
 
@@ -65,8 +73,6 @@ public:
 	bool SendRR(bool isAudio);
 	void ReportSR(uint64_t ntpMicroseconds, uint32_t rtpTimestamp, bool isAudio);
 private:
-	bool InitializeUDP(Variant &videoTrack, Variant &audioTrack);
-	bool InitializeTCP(Variant &videoTrack, Variant &audioTrack);
 	void Cleanup();
 	bool CreateCarriers(InboundRTPProtocol *pRTP, RTCPProtocol *pRTCP);
 };

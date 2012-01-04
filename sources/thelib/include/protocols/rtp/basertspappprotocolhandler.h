@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -31,14 +31,21 @@ class OutboundConnectivity;
 
 class DLLEXP BaseRTSPAppProtocolHandler
 : public BaseAppProtocolHandler {
+protected:
+	Variant _realms;
+	string _usersFile;
+	double _lastUsersFileUpdate;
 public:
 	BaseRTSPAppProtocolHandler(Variant &configuration);
 	virtual ~BaseRTSPAppProtocolHandler();
+
+	virtual bool ParseAuthenticationNode(Variant &node, Variant &result);
 
 	virtual void RegisterProtocol(BaseProtocol *pProtocol);
 	virtual void UnRegisterProtocol(BaseProtocol *pProtocol);
 
 	virtual bool PullExternalStream(URI uri, Variant streamConfig);
+	virtual bool PushLocalStream(Variant streamConfig);
 	static bool SignalProtocolCreated(BaseProtocol *pProtocol,
 			Variant &parameters);
 
@@ -66,12 +73,17 @@ protected:
 			Variant &requestHeaders, string &requestContent);
 	virtual bool HandleRTSPRequestRecord(RTSPProtocol *pFrom,
 			Variant &requestHeaders, string &requestContent);
+	virtual bool HandleRTSPRequestPause(RTSPProtocol *pFrom,
+			Variant &requestHeaders, string &requestContent);
 
 	//handle response routines
 	virtual bool HandleRTSPResponse(RTSPProtocol *pFrom, Variant &requestHeaders,
 			string &requestContent, Variant &responseHeaders,
 			string &responseContent);
 	virtual bool HandleRTSPResponse200(RTSPProtocol *pFrom, Variant &requestHeaders,
+			string &requestContent, Variant &responseHeaders,
+			string &responseContent);
+	virtual bool HandleRTSPResponse401(RTSPProtocol *pFrom, Variant &requestHeaders,
 			string &requestContent, Variant &responseHeaders,
 			string &responseContent);
 	virtual bool HandleRTSPResponse404(RTSPProtocol *pFrom, Variant &requestHeaders,
@@ -89,21 +101,39 @@ protected:
 	virtual bool HandleRTSPResponse200Play(RTSPProtocol *pFrom, Variant &requestHeaders,
 			string &requestContent, Variant &responseHeaders,
 			string &responseContent);
+	virtual bool HandleRTSPResponse200Announce(RTSPProtocol *pFrom, Variant &requestHeaders,
+			string &requestContent, Variant &responseHeaders,
+			string &responseContent);
+	virtual bool HandleRTSPResponse200Record(RTSPProtocol *pFrom, Variant &requestHeaders,
+			string &requestContent, Variant &responseHeaders,
+			string &responseContent);
 	virtual bool HandleRTSPResponse404Play(RTSPProtocol *pFrom, Variant &requestHeaders,
+			string &requestContent, Variant &responseHeaders,
+			string &responseContent);
+	virtual bool HandleRTSPResponse404Describe(RTSPProtocol *pFrom, Variant &requestHeaders,
 			string &requestContent, Variant &responseHeaders,
 			string &responseContent);
 
 	//operations
-	virtual bool Play(RTSPProtocol *pFrom);
+	virtual bool TriggerPlayOrAnnounce(RTSPProtocol *pFrom);
+protected:
+	virtual bool NeedAuthentication(RTSPProtocol *pFrom,
+			Variant &requestHeaders, string &requestContent);
+	virtual string GetAuthenticationRealm(RTSPProtocol *pFrom,
+			Variant &requestHeaders, string &requestContent);
 private:
-	OutboundConnectivity *GetOutboundConnectivity(RTSPProtocol *pFrom);
+	OutboundConnectivity *GetOutboundConnectivity(RTSPProtocol *pFrom, bool forceTcp);
 	BaseInNetStream *GetInboundStream(string streamName);
 	StreamCapabilities *GetInboundStreamCapabilities(string streamName);
 	string GetAudioTrack(RTSPProtocol *pFrom,
 			StreamCapabilities *pCapabilities);
 	string GetVideoTrack(RTSPProtocol *pFrom,
 			StreamCapabilities *pCapabilities);
-	bool SendSetupTrackMessages(RTSPProtocol *pFrom, string sessionId);
+	bool SendSetupTrackMessages(RTSPProtocol *pFrom);
+	bool ParseUsersFile();
+	bool SendAuthenticationChallenge(RTSPProtocol *pFrom, Variant &realm);
+	string ComputeSDP(RTSPProtocol *pFrom, string localStreamName,
+			string targetStreamName, string host);
 };
 
 

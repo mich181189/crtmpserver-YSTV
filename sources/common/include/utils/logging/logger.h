@@ -21,17 +21,13 @@
 #ifndef _LOGGER_H
 #define _LOGGER_H
 
-#include "platform/platform.h"
+#include "common.h"
 #ifdef HAS_SAFE_LOGGER
 #include <pthread.h>
 #endif /* HAS_SAFE_LOGGER */
 
 class BaseLogLocation;
 
-/*!
-	@class Logger
-	@brief Class that implements logging capabilites of the Evostream server.
-*/
 class DLLEXP Logger {
 private:
 	static Logger *_pLogger; //! Pointer to the Logger class.
@@ -45,28 +41,14 @@ public:
 	Logger();
 	virtual ~Logger();
 
-	/*! @brief Initiates the logger */
 	static void Init();
-	/*! @brief Releases the logger
-		@param freeApenders: Releases the logger when set to @c true
-	*/
 	static void Free(bool freeAppenders);
-
-	/*! @brief Writes the log messages to the logger
-		@param level: Variable that indicates how critical the log is about. It ranges from "INFO" to "FATAL".
-		@param filename: Shows file name of the source code that displayed the log message.
-		@param lineNumber: Shows line number in the source code that displayed the log message.
-		@param functionName: Shows the name of the function that displayed the log message.
-		@param formatString: Accepts the log message and displays it in the appropriate format.
-	*/
 	static void Log(int32_t level, string fileName, uint32_t lineNumber,
 			string functionName, string formatString, ...);
-
-	/*! @brief Allows saving of the logs in a specified location
-		@param plogLocation: Pointer to the BaseLogLocation
-		@sa BaseLogLocation
-	*/
+	static void LogProd(int32_t level, string fileName, uint32_t lineNumber,
+			string functionName, Variant &le);
 	static bool AddLogLocation(BaseLogLocation *pLogLocation);
+	static void SignalFork();
 };
 
 

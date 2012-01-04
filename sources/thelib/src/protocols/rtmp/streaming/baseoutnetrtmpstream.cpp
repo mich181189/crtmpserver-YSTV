@@ -39,6 +39,10 @@
 
 #define ALLOW_EXECUTION(feederProcessed,dataLength,isAudio) if (!AllowExecution(feederProcessed,dataLength,isAudio)) { /*FINEST("We are not allowed to send this data");*/ return true; }
 
+//if needed, we can simulate dropping frames
+//the number represents the percent of frames that we will drop (0-100)
+//#define SIMULATE_DROPPING_FRAMES 40
+
 BaseOutNetRTMPStream::BaseOutNetRTMPStream(BaseProtocol *pProtocol,
 		StreamsManager *pStreamsManager, uint64_t type, string name, uint32_t rtmpStreamId,
 		uint32_t chunkSize)
@@ -56,7 +60,8 @@ BaseOutNetRTMPStream::BaseOutNetRTMPStream(BaseProtocol *pProtocol,
 
 	_feederChunkSize = 0xffffffff;
 	_canDropFrames = true;
-	_currentFrameDropped = false;
+	_audioCurrentFrameDropped = false;
+	_videoCurrentFrameDropped = false;
 	_maxBufferSize = 65536 * 2;
 	_attachedStreamType = 0;
 	_clientId = format("%d_%d_%"PRIz"u", _pProtocol->GetId(), _rtmpStreamId, (size_t)this);
@@ -151,8 +156,8 @@ void BaseOutNetRTMPStream::SetSendOnStatusPlayMessages(bool value) {
 	_sendOnStatusPlayMessages = value;
 }
 
-void BaseOutNetRTMPStream::GetStats(Variant &info) {
-	BaseOutNetStream::GetStats(info);
+void BaseOutNetRTMPStream::GetStats(Variant &info, uint32_t namespaceId) {
+	BaseOutNetStream::GetStats(info, namespaceId);
 	info["canDropFrames"] = (bool)_canDropFrames;
 	info["audio"]["packetsCount"] = _audioPacketsCount;
 	info["audio"]["droppedPacketsCount"] = _audioDroppedPacketsCount;
@@ -174,6 +179,7 @@ bool BaseOutNetRTMPStream::FeedData(uint8_t *pData, uint32_t dataLength,
 			_audioPacketsCount++;
 		_audioBytesCount += dataLength;
 		if (_isFirstAudioFrame) {
+			_audioCurrentFrameDropped = false;
 			if (dataLength == 0)
 				return true;
 
@@ -186,6 +192,11 @@ bool BaseOutNetRTMPStream::FeedData(uint8_t *pData, uint32_t dataLength,
 
 			if ((*_pDeltaAudioTime) < 0)
 				(*_pDeltaAudioTime) = absoluteTimestamp;
+			if ((*_pDeltaAudioTime) > absoluteTimestamp) {
+				//FINEST("A: WAIT: D: %.2f", (*_pDeltaAudioTime) - absoluteTimestamp);
+				_pRTMPProtocol->EnqueueForOutbound();
+				return true;
+			}
 
 			H_IA(_audioHeader) = true;
 			H_TS(_audioHeader) = (uint32_t) (absoluteTimestamp - (*_pDeltaAudioTime) + _seekTime);
@@ -214,6 +225,7 @@ bool BaseOutNetRTMPStream::FeedData(uint8_t *pData, uint32_t dataLength,
 			_videoPacketsCount++;
 		_videoBytesCount += dataLength;
 		if (_isFirstVideoFrame) {
+			_videoCurrentFrameDropped = false;
 			if (dataLength == 0)
 				return true;
 
@@ -236,6 +248,11 @@ bool BaseOutNetRTMPStream::FeedData(uint8_t *pData, uint32_t dataLength,
 
 			if ((*_pDeltaVideoTime) < 0)
 				(*_pDeltaVideoTime) = absoluteTimestamp;
+			if ((*_pDeltaVideoTime) > absoluteTimestamp) {
+				//FINEST("V: WAIT: D: %.2f", (*_pDeltaVideoTime) - absoluteTimestamp);
+				_pRTMPProtocol->EnqueueForOutbound();
+				return true;
+			}
 
 			H_IA(_videoHeader) = true;
 			H_TS(_videoHeader) = (uint32_t) (absoluteTimestamp - (*_pDeltaVideoTime) + _seekTime);
@@ -303,20 +320,29 @@ void BaseOutNetRTMPStream::SignalAttachedToInStream() {
 		_completeMetadata = pInFileRTMPStream->GetCompleteMetadata();
 	}
 
+	Variant message;
+
 	//5. Send abort messages on audio/video channels
-	Variant message = GenericMessageFactory::GetAbortMessage(_pChannelAudio->id);
-	TRACK_MESSAGE("Message:\n%s", STR(message.ToString()));
-	if (!_pRTMPProtocol->SendMessage(message)) {
-		FATAL("Unable to send message");
-		_pRTMPProtocol->EnqueueForDelete();
-		return;
+	if (_pChannelAudio->lastOutProcBytes != 0) {
+		message = GenericMessageFactory::GetAbortMessage(_pChannelAudio->id);
+		TRACK_MESSAGE("Message:\n%s", STR(message.ToString()));
+		if (!_pRTMPProtocol->SendMessage(message)) {
+			FATAL("Unable to send message");
+			_pRTMPProtocol->EnqueueForDelete();
+			return;
+		}
+		_pChannelAudio->Reset();
 	}
-	message = GenericMessageFactory::GetAbortMessage(_pChannelVideo->id);
-	TRACK_MESSAGE("Message:\n%s", STR(message.ToString()));
-	if (!_pRTMPProtocol->SendMessage(message)) {
-		FATAL("Unable to send message");
-		_pRTMPProtocol->EnqueueForDelete();
-		return;
+
+	if (_pChannelVideo->lastOutProcBytes != 0) {
+		message = GenericMessageFactory::GetAbortMessage(_pChannelVideo->id);
+		TRACK_MESSAGE("Message:\n%s", STR(message.ToString()));
+		if (!_pRTMPProtocol->SendMessage(message)) {
+			FATAL("Unable to send message");
+			_pRTMPProtocol->EnqueueForDelete();
+			return;
+		}
+		_pChannelVideo->Reset();
 	}
 
 	//6. Stream is recorded
@@ -403,19 +429,27 @@ void BaseOutNetRTMPStream::SignalAttachedToInStream() {
 		StreamCapabilities *pCapabilities = GetCapabilities();
 		if (pCapabilities != NULL) {
 			if (pCapabilities->videoCodecId == CODEC_VIDEO_AVC) {
-				if ((pCapabilities->avc._width != 0)
+				Variant meta;
+				meta.IsArray(false);
+				if ((pCapabilities->avc._widthOverride != 0)
+						&& (pCapabilities->avc._heightOverride != 0)) {
+					meta["width"] = pCapabilities->avc._widthOverride;
+					meta["height"] = pCapabilities->avc._heightOverride;
+				} else if ((pCapabilities->avc._width != 0)
 						&& (pCapabilities->avc._height != 0)) {
-					Variant meta;
 					meta["width"] = pCapabilities->avc._width;
 					meta["height"] = pCapabilities->avc._height;
-					message = StreamMessageFactory::GetNotifyOnMetaData(_pChannelAudio->id,
-							_rtmpStreamId, 0, false, meta);
-					TRACK_MESSAGE("Message:\n%s", STR(message.ToString()));
-					if (!_pRTMPProtocol->SendMessage(message)) {
-						FATAL("Unable to send message");
-						_pRTMPProtocol->EnqueueForDelete();
-						return;
-					}
+				}
+				if (pCapabilities->bandwidthHint != 0) {
+					meta["bandwidth"] = (uint32_t) pCapabilities->bandwidthHint;
+				}
+				message = StreamMessageFactory::GetNotifyOnMetaData(_pChannelAudio->id,
+						_rtmpStreamId, 0, false, meta);
+				TRACK_MESSAGE("Message:\n%s", STR(message.ToString()));
+				if (!_pRTMPProtocol->SendMessage(message)) {
+					FATAL("Unable to send message");
+					_pRTMPProtocol->EnqueueForDelete();
+					return;
 				}
 			}
 		}
@@ -763,54 +797,64 @@ bool BaseOutNetRTMPStream::ChunkAndSend(uint8_t *pData, uint32_t length,
 }
 
 bool BaseOutNetRTMPStream::AllowExecution(uint32_t totalProcessed, uint32_t dataLength, bool isAudio) {
-	if (_canDropFrames) {
-		//we are allowed to drop frames
-
-		uint64_t &bytesCounter = isAudio ? _audioDroppedBytesCount : _videoDroppedBytesCount;
-		uint64_t &packetsCounter = isAudio ? _audioDroppedPacketsCount : _videoDroppedPacketsCount;
-
-		if (_currentFrameDropped) {
-			//current frame was dropped. Test to see if we are in the middle
-			//of it or this is a new one
-			if (totalProcessed != 0) {
-				//we are in the middle of it. Don't allow execution
-				bytesCounter += dataLength;
-				return false;
-			} else {
-				//this is a new frame. We will detect later if it can be sent
-				_currentFrameDropped = false;
-			}
-		}
-
-		if (totalProcessed == 0) {
-			//we have a brand new frame
-
-			if (_pRTMPProtocol->GetOutputBuffer() != NULL) {
-				//we have some data in the output buffer
-
-
-				if (GETAVAILABLEBYTESCOUNT(*_pRTMPProtocol->GetOutputBuffer()) > _maxBufferSize) {
-					//we have too many data left unsent. Drop the frame
-					packetsCounter++;
-					bytesCounter += dataLength;
-					_currentFrameDropped = true;
-					return false;
-				} else {
-					//we can still pump data
-					return true;
-				}
-			} else {
-				//no data in the output buffer. Allow to send it
-				return true;
-			}
-		} else {
-			//we are in the middle of a non-dropped frame. Send it anyway
-			return true;
-		}
-	} else {
+	if (!_canDropFrames) {
 		// we are not allowed to drop frames
 		return true;
 	}
+
+	//we are allowed to drop frames
+	uint64_t &bytesCounter = isAudio ? _audioDroppedBytesCount : _videoDroppedBytesCount;
+	uint64_t &packetsCounter = isAudio ? _audioDroppedPacketsCount : _videoDroppedPacketsCount;
+	bool &currentFrameDropped = isAudio ? _audioCurrentFrameDropped : _videoCurrentFrameDropped;
+
+	if (currentFrameDropped) {
+		//current frame was dropped. Test to see if we are in the middle
+		//of it or this is a new one
+		if (totalProcessed != 0) {
+			//we are in the middle of it. Don't allow execution
+			bytesCounter += dataLength;
+			return false;
+		} else {
+			//this is a new frame. We will detect later if it can be sent
+			currentFrameDropped = false;
+		}
+	}
+
+	if (totalProcessed != 0) {
+		//we are in the middle of a non-dropped frame. Send it anyway
+		return true;
+	}
+
+#ifdef SIMULATE_DROPPING_FRAMES
+	if ((rand() % 100) < SIMULATE_DROPPING_FRAMES) {
+		//we have too many data left unsent. Drop the frame
+		packetsCounter++;
+		bytesCounter += dataLength;
+		currentFrameDropped = true;
+		return false;
+	} else {
+		//we can still pump data
+		return true;
+	}
+#else /* SIMULATE_DROPPING_FRAMES */
+	//do we have any data?
+	if (_pRTMPProtocol->GetOutputBuffer() == NULL) {
+		//no data in the output buffer. Allow to send it
+		return true;
+	}
+
+	//we have some data in the output buffer
+	if (GETAVAILABLEBYTESCOUNT(*_pRTMPProtocol->GetOutputBuffer()) > _maxBufferSize) {
+		//we have too many data left unsent. Drop the frame
+		packetsCounter++;
+		bytesCounter += dataLength;
+		currentFrameDropped = true;
+		return false;
+	} else {
+		//we can still pump data
+		return true;
+	}
+#endif /* SIMULATE_DROPPING_FRAMES */
 }
 
 void BaseOutNetRTMPStream::InternalReset() {
@@ -824,6 +868,7 @@ void BaseOutNetRTMPStream::InternalReset() {
 	_pDeltaVideoTime = &_deltaVideoTime;
 	_seekTime = 0;
 
+	_videoCurrentFrameDropped = false;
 	_isFirstVideoFrame = true;
 	H_CI(_videoHeader) = _pChannelVideo->id;
 	H_MT(_videoHeader) = RM_HEADER_MESSAGETYPE_VIDEODATA;
@@ -831,6 +876,7 @@ void BaseOutNetRTMPStream::InternalReset() {
 	_videoHeader.readCompleted = 0;
 	_videoBucket.IgnoreAll();
 
+	_audioCurrentFrameDropped = false;
 	_isFirstAudioFrame = true;
 	H_CI(_audioHeader) = _pChannelAudio->id;
 	H_MT(_audioHeader) = RM_HEADER_MESSAGETYPE_AUDIODATA;

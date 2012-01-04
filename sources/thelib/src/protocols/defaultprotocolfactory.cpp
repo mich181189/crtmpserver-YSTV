@@ -39,11 +39,10 @@
 #include "protocols/rtp/rtcpprotocol.h"
 #include "protocols/cli/inboundjsoncliprotocol.h"
 #include "protocols/rtmp/inboundrtmpsdiscriminatorprotocol.h"
-#include "protocols/rtmfp/inboundrtmfpprotocol.h"
-#include "protocols/rtmfp/outboundrtmfpprotocol.h"
 #include "protocols/cli/http4cliprotocol.h"
 #include "protocols/mms/mmsprotocol.h"
 #include "protocols/rawhttpstream/inboundrawhttpstreamprotocol.h"
+#include "protocols/rtp/nattraversalprotocol.h"
 
 DefaultProtocolFactory::DefaultProtocolFactory()
 : BaseProtocolFactory() {
@@ -79,10 +78,6 @@ vector<uint64_t> DefaultProtocolFactory::HandledProtocols() {
 	ADD_VECTOR_END(result, PT_OUTBOUND_HTTP_FOR_RTMP);
 #endif /* HAS_PROTOCOL_HTTP */
 #endif /* HAS_PROTOCOL_RTMP */
-#ifdef HAS_PROTOCOL_RTMFP
-	ADD_VECTOR_END(result, PT_INBOUND_RTMFP);
-	ADD_VECTOR_END(result, PT_OUTBOUND_RTMFP);
-#endif /* HAS_PROTOCOL_RTMFP */
 #ifdef HAS_PROTOCOL_HTTP
 	ADD_VECTOR_END(result, PT_INBOUND_HTTP);
 	ADD_VECTOR_END(result, PT_OUTBOUND_HTTP);
@@ -99,6 +94,7 @@ vector<uint64_t> DefaultProtocolFactory::HandledProtocols() {
 	ADD_VECTOR_END(result, PT_RTSP);
 	ADD_VECTOR_END(result, PT_RTCP);
 	ADD_VECTOR_END(result, PT_INBOUND_RTP);
+	ADD_VECTOR_END(result, PT_RTP_NAT_TRAVERSAL);
 #endif /* HAS_PROTOCOL_RTP */
 #ifdef HAS_PROTOCOL_CLI
 	ADD_VECTOR_END(result, PT_INBOUND_JSONCLI);
@@ -127,10 +123,6 @@ vector<string> DefaultProtocolFactory::HandledProtocolChains() {
 	ADD_VECTOR_END(result, CONF_PROTOCOL_INBOUND_RTMPT);
 #endif /* HAS_PROTOCOL_HTTP */
 #endif /* HAS_PROTOCOL_RTMP */
-#ifdef HAS_PROTOCOL_RTMFP
-	ADD_VECTOR_END(result, CONF_PROTOCOL_INBOUND_RTMFP);
-	ADD_VECTOR_END(result, CONF_PROTOCOL_OUTBOUND_RTMFP);
-#endif /* HAS_PROTOCOL_RTMFP */
 #ifdef HAS_PROTOCOL_TS
 	ADD_VECTOR_END(result, CONF_PROTOCOL_INBOUND_TCP_TS);
 	ADD_VECTOR_END(result, CONF_PROTOCOL_INBOUND_UDP_TS);
@@ -160,6 +152,7 @@ vector<string> DefaultProtocolFactory::HandledProtocolChains() {
 	ADD_VECTOR_END(result, CONF_PROTOCOL_UDP_RTCP);
 	ADD_VECTOR_END(result, CONF_PROTOCOL_INBOUND_RTSP_RTP);
 	ADD_VECTOR_END(result, CONF_PROTOCOL_INBOUND_UDP_RTP);
+	ADD_VECTOR_END(result, CONF_PROTOCOL_RTP_NAT_TRAVERSAL);
 #endif /* HAS_PROTOCOL_RTP */
 #ifdef HAS_PROTOCOL_CLI
 	ADD_VECTOR_END(result, CONF_PROTOCOL_INBOUND_CLI_JSON);
@@ -211,15 +204,6 @@ vector<uint64_t> DefaultProtocolFactory::ResolveProtocolChain(string name) {
 	}
 #endif /* HAS_PROTOCOL_HTTP */
 #endif /* HAS_PROTOCOL_RTMP */
-#ifdef HAS_PROTOCOL_RTMFP
-	else if (name == CONF_PROTOCOL_INBOUND_RTMFP) {
-		ADD_VECTOR_END(result, PT_UDP);
-		ADD_VECTOR_END(result, PT_INBOUND_RTMFP);
-	} else if (name == CONF_PROTOCOL_OUTBOUND_RTMFP) {
-		ADD_VECTOR_END(result, PT_UDP);
-		ADD_VECTOR_END(result, PT_OUTBOUND_RTMFP);
-	}
-#endif /* HAS_PROTOCOL_RTMFP */
 #ifdef HAS_PROTOCOL_TS
 	else if (name == CONF_PROTOCOL_INBOUND_TCP_TS) {
 		ADD_VECTOR_END(result, PT_TCP);
@@ -247,6 +231,9 @@ vector<uint64_t> DefaultProtocolFactory::ResolveProtocolChain(string name) {
 	} else if (name == CONF_PROTOCOL_INBOUND_UDP_RTP) {
 		ADD_VECTOR_END(result, PT_UDP);
 		ADD_VECTOR_END(result, PT_INBOUND_RTP);
+	} else if (name == CONF_PROTOCOL_RTP_NAT_TRAVERSAL) {
+		ADD_VECTOR_END(result, PT_UDP);
+		ADD_VECTOR_END(result, PT_RTP_NAT_TRAVERSAL);
 	}
 #endif /* HAS_PROTOCOL_RTP */
 #ifdef HAS_PROTOCOL_HTTP
@@ -370,14 +357,6 @@ BaseProtocol *DefaultProtocolFactory::SpawnProtocol(uint64_t type, Variant &para
 			break;
 #endif /* HAS_PROTOCOL_HTTP */
 #endif /* HAS_PROTOCOL_RTMP */
-#ifdef HAS_PROTOCOL_RTMFP
-		case PT_INBOUND_RTMFP:
-			pResult = new InboundRTMFPProtocol();
-			break;
-		case PT_OUTBOUND_RTMFP:
-			pResult = new OutboundRTMFPProtocol();
-			break;
-#endif /* HAS_PROTOCOL_RTMFP */
 #ifdef HAS_PROTOCOL_TS
 		case PT_INBOUND_TS:
 			pResult = new InboundTSProtocol();
@@ -413,6 +392,9 @@ BaseProtocol *DefaultProtocolFactory::SpawnProtocol(uint64_t type, Variant &para
 			break;
 		case PT_INBOUND_RTP:
 			pResult = new InboundRTPProtocol();
+			break;
+		case PT_RTP_NAT_TRAVERSAL:
+			pResult = new NATTraversalProtocol();
 			break;
 #endif /* HAS_PROTOCOL_RTP */
 #ifdef HAS_PROTOCOL_CLI

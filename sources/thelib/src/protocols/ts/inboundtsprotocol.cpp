@@ -110,6 +110,10 @@ bool InboundTSProtocol::SignalInputData(int32_t recvAmount) {
 	return false;
 }
 
+bool InboundTSProtocol::SignalInputData(IOBuffer &buffer, sockaddr_in *pPeerAddress) {
+	return SignalInputData(buffer);
+}
+
 bool InboundTSProtocol::SignalInputData(IOBuffer &buffer) {
 	if (_chunkSize == 0) {
 		if (!DetermineChunkSize(buffer)) {
@@ -136,7 +140,7 @@ bool InboundTSProtocol::SignalInputData(IOBuffer &buffer) {
 		uint32_t packetHeader = ENTOHLP(GETIBPOINTER(buffer));
 
 		if (!ProcessPacket(packetHeader, buffer, _chunkSize)) {
-			FATAL("Unable to process packet:\n%s", STR(buffer));
+			FATAL("Unable to process packet");
 			return false;
 		}
 
@@ -257,13 +261,15 @@ bool InboundTSProtocol::ProcessPacket(uint32_t packetHeader,
 		{
 			return pPIDDescriptor->payload.pStream->FeedData(pBuffer + cursor,
 					_chunkSize - cursor,
-					TS_TRANSPORT_PACKET_IS_PAYLOAD_START(packetHeader), true);
+					TS_TRANSPORT_PACKET_IS_PAYLOAD_START(packetHeader), true,
+					(int8_t) packetHeader & 0x0f);
 		}
 		case PID_TYPE_VIDEOSTREAM:
 		{
 			return pPIDDescriptor->payload.pStream->FeedData(pBuffer + cursor,
 					_chunkSize - cursor,
-					TS_TRANSPORT_PACKET_IS_PAYLOAD_START(packetHeader), false);
+					TS_TRANSPORT_PACKET_IS_PAYLOAD_START(packetHeader), false,
+					(int8_t) packetHeader & 0x0f);
 		}
 		case PID_TYPE_RESERVED:
 		{
@@ -272,8 +278,12 @@ bool InboundTSProtocol::ProcessPacket(uint32_t packetHeader,
 		}
 		case PID_TYPE_UNKNOWN:
 		{
-			WARN("PID %hu not known yet", pPIDDescriptor->pid);
+			if (!MAP_HAS1(_unknownPids, pPIDDescriptor->pid)) {
+				WARN("PID %hu not known yet", pPIDDescriptor->pid);
+				_unknownPids[pPIDDescriptor->pid] = pPIDDescriptor->pid;
+			}
 			return true;
+
 		}
 		case PID_TYPE_NULL:
 		{
@@ -418,11 +428,22 @@ bool InboundTSProtocol::ProcessPidTypePMT(uint32_t packetHeader,
 		}
 	}
 
+	//4. Compute the stream name
+	string streamName = "";
+	if (GetCustomParameters().HasKeyChain(V_STRING, true, 1, "localStreamName"))
+		streamName = (string) GetCustomParameters()["localStreamName"];
+	else
+		streamName = format("ts_%u_%hu_%hu", GetId(), audioPid, videoPid);
+
 	//4. Create the stream if we have at least videoPid or audioPid
 	InNetTSStream *pStream = NULL;
 	if ((videoPid != 0) || (audioPid != 0)) {
+		if (!GetApplication()->StreamNameAvailable(streamName, this)) {
+			FATAL("Stream name %s already taken", STR(streamName));
+			return false;
+		}
 		pStream = new InNetTSStream(this, GetApplication()->GetStreamsManager(),
-				format("ts_%u_%hu_%hu", GetId(), audioPid, videoPid));
+				streamName, packetPMT.GetBandwidth());
 	}
 
 	//5. Create the pid descriptors for audioPid and videoPid and store them

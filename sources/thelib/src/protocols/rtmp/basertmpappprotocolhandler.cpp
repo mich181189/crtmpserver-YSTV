@@ -32,6 +32,8 @@
 #include "streaming/baseinstream.h"
 #include "streaming/baseinnetstream.h"
 
+#define ONBWCHECK_SIZE 32767
+
 BaseRTMPAppProtocolHandler::BaseRTMPAppProtocolHandler(Variant &configuration)
 : BaseAppProtocolHandler(configuration) {
 	_validateHandshake = (bool)configuration[CONF_APPLICATION_VALIDATEHANDSHAKE];
@@ -41,42 +43,91 @@ BaseRTMPAppProtocolHandler::BaseRTMPAppProtocolHandler(Variant &configuration)
 	_mediaFolder = (string) configuration[CONF_APPLICATION_MEDIAFOLDER];
 	_renameBadFiles = (bool)configuration[CONF_APPLICATION_RENAMEBADFILES];
 	_externSeekGenerator = (bool)configuration[CONF_APPLICATION_EXTERNSEEKGENERATOR];
-	if (_configuration.HasKey(CONF_APPLICATION_AUTH)) {
-		if ((!_configuration[CONF_APPLICATION_AUTH].HasKey(CONF_APPLICATION_AUTH_TYPE))
-				|| (_configuration[CONF_APPLICATION_AUTH][CONF_APPLICATION_AUTH_TYPE] != V_STRING)
-				|| (_configuration[CONF_APPLICATION_AUTH][CONF_APPLICATION_AUTH_TYPE] != CONF_APPLICATION_AUTH_TYPE_ADOBE)
-				|| (!_configuration[CONF_APPLICATION_AUTH].HasKey(CONF_APPLICATION_AUTH_ENCODER_AGENTS))
-				|| (_configuration[CONF_APPLICATION_AUTH][CONF_APPLICATION_AUTH_ENCODER_AGENTS] != V_MAP)
-				|| (_configuration[CONF_APPLICATION_AUTH][CONF_APPLICATION_AUTH_ENCODER_AGENTS].MapSize() == 0)
-				|| (!_configuration[CONF_APPLICATION_AUTH].HasKey(CONF_APPLICATION_AUTH_USERS_FILE))
-				|| (_configuration[CONF_APPLICATION_AUTH][CONF_APPLICATION_AUTH_USERS_FILE] != V_STRING)
-				|| (_configuration[CONF_APPLICATION_AUTH][CONF_APPLICATION_AUTH_USERS_FILE] == "")
-				) {
-			WARN("Invalid authentication configuration");
-			_authMethod = "";
-		} else {
-			string usersFile = _configuration[CONF_APPLICATION_AUTH][CONF_APPLICATION_AUTH_USERS_FILE];
-			if (usersFile[0] != '/') {
-				usersFile = (string) _configuration[CONF_APPLICATION_DIRECTORY] + usersFile;
-				_configuration[CONF_APPLICATION_AUTH][CONF_APPLICATION_AUTH_USERS_FILE] = usersFile;
-			}
-			if (!fileExists(_configuration[CONF_APPLICATION_AUTH][CONF_APPLICATION_AUTH_USERS_FILE])) {
-				WARN("Invalid authentication configuration. Missing users file: %s",
-						STR(_configuration[CONF_APPLICATION_AUTH][CONF_APPLICATION_AUTH_USERS_FILE]));
-				_authMethod = "";
-			} else {
-				_adobeAuthSalt = generateRandomString(32);
-				_adobeAuthSettings = _configuration[CONF_APPLICATION_AUTH];
-				_authMethod = (string) _configuration[CONF_APPLICATION_AUTH][CONF_APPLICATION_AUTH_TYPE];
-			}
-		}
-	} else {
-		_authMethod = "";
+	_enableCheckBandwidth = false;
+	if (_configuration.HasKeyChain(V_BOOL, false, 1, "enableCheckBandwidth")) {
+		_enableCheckBandwidth = (bool)_configuration.GetValue(
+				"enableCheckBandwidth", false);
 	}
-
+	if (_enableCheckBandwidth) {
+		Variant parameters;
+		parameters.PushToArray(Variant());
+		parameters.PushToArray(generateRandomString(ONBWCHECK_SIZE));
+		_onBWCheckMessage = GenericMessageFactory::GetInvoke(3, 0, 0, false, 0,
+				RM_INVOKE_FUNCTION_ONBWCHECK, parameters);
+		_onBWCheckStrippedMessage[RM_INVOKE][RM_INVOKE_FUNCTION] = RM_INVOKE_FUNCTION_ONBWCHECK;
+	}
+	_lastUsersFileUpdate = 0;
 	if ((bool)configuration[CONF_APPLICATION_GENERATE_META_FILES]) {
 		GenerateMetaFiles();
 	}
+}
+
+bool BaseRTMPAppProtocolHandler::ParseAuthenticationNode(Variant &node,
+		Variant &result) {
+#ifndef HAS_LUA
+	ASSERT("Lua is not supported by the current build of the server. Adobe authentication needs lua support");
+	return false;
+#endif
+	//1. Validation
+	if ((!node.HasKeyChain(V_STRING, true, 1, CONF_APPLICATION_AUTH_TYPE))
+			|| ((string) node[CONF_APPLICATION_AUTH_TYPE] != CONF_APPLICATION_AUTH_TYPE_ADOBE)) {
+		FATAL("Invalid authentication type");
+		return false;
+	}
+
+	if ((!node.HasKeyChain(V_MAP, true, 1, CONF_APPLICATION_AUTH_ENCODER_AGENTS))
+			|| (node[CONF_APPLICATION_AUTH_ENCODER_AGENTS].MapSize() == 0)) {
+		FATAL("Invalid encoder agents array");
+		return false;
+	}
+
+	if ((!node.HasKeyChain(V_STRING, true, 1, CONF_APPLICATION_AUTH_USERS_FILE))
+			|| (node[CONF_APPLICATION_AUTH_USERS_FILE] == "")) {
+		FATAL("Invalid users file path");
+		return false;
+	}
+
+	//2. Users file validation
+	string usersFile = node[CONF_APPLICATION_AUTH_USERS_FILE];
+	if ((usersFile[0] != '/') && (usersFile[0] != '.')) {
+		usersFile = (string) _configuration[CONF_APPLICATION_DIRECTORY] + usersFile;
+	}
+	if (!fileExists(usersFile)) {
+		FATAL("Invalid authentication configuration. Missing users file: %s", STR(usersFile));
+		return false;
+	}
+
+	//3. Build the result
+	result[CONF_APPLICATION_AUTH_TYPE] = CONF_APPLICATION_AUTH_TYPE_ADOBE;
+	result[CONF_APPLICATION_AUTH_USERS_FILE] = usersFile;
+
+	FOR_MAP(node[CONF_APPLICATION_AUTH_ENCODER_AGENTS], string, Variant, i) {
+		if ((MAP_VAL(i) != V_STRING) || (MAP_VAL(i) == "")) {
+			FATAL("Invalid encoder agent encountered");
+			return false;
+		}
+		result[CONF_APPLICATION_AUTH_ENCODER_AGENTS][(string) MAP_VAL(i)] = MAP_VAL(i);
+	}
+	result["adobeAuthSalt"] = _adobeAuthSalt = generateRandomString(32);
+	_adobeAuthSettings = result;
+	_authMethod = CONF_APPLICATION_AUTH_TYPE_ADOBE;
+
+	double modificationDate = getFileModificationDate(usersFile);
+	if (modificationDate == 0) {
+		FATAL("Unable to get last modification date for file %s", STR(usersFile));
+		return false;
+	}
+
+	if (modificationDate != _lastUsersFileUpdate) {
+		_users.Reset();
+		if (!ReadLuaFile(usersFile, "users", _users)) {
+			FATAL("Unable to read users file: `%s`", STR(usersFile));
+			return false;
+		}
+		_lastUsersFileUpdate = modificationDate;
+	}
+
+	return true;
 }
 
 BaseRTMPAppProtocolHandler::~BaseRTMPAppProtocolHandler() {
@@ -96,8 +147,8 @@ SOManager *BaseRTMPAppProtocolHandler::GetSOManager() {
 }
 
 void BaseRTMPAppProtocolHandler::RegisterProtocol(BaseProtocol *pProtocol) {
-	FINEST("Register protocol %s to application %s",
-			STR(*pProtocol), STR(GetApplication()->GetName()));
+	//	FINEST("Register protocol %s to application %s",
+	//			STR(*pProtocol), STR(GetApplication()->GetName()));
 	if (MAP_HAS1(_connections, pProtocol->GetId()))
 		return;
 	_connections[pProtocol->GetId()] = (BaseRTMPProtocol *) pProtocol;
@@ -116,14 +167,14 @@ void BaseRTMPAppProtocolHandler::UnRegisterProtocol(BaseProtocol *pProtocol) {
 
 bool BaseRTMPAppProtocolHandler::PullExternalStream(URI uri, Variant streamConfig) {
 	//1. normalize the stream name
-	string streamName = "";
+	string localStreamName = "";
 	if (streamConfig["localStreamName"] == V_STRING)
-		streamName = (string) streamConfig["localStreamName"];
-	trim(streamName);
-	if (streamName == "") {
+		localStreamName = (string) streamConfig["localStreamName"];
+	trim(localStreamName);
+	if (localStreamName == "") {
 		streamConfig["localStreamName"] = "stream_" + generateRandomString(8);
 		WARN("No localstream name for external URI: %s. Defaulted to %s",
-				STR(uri.fullUri),
+				STR(uri.fullUri()),
 				STR(streamConfig["localStreamName"]));
 	}
 
@@ -131,23 +182,55 @@ bool BaseRTMPAppProtocolHandler::PullExternalStream(URI uri, Variant streamConfi
 	Variant parameters;
 	parameters["customParameters"]["externalStreamConfig"] = streamConfig;
 	parameters[CONF_APPLICATION_NAME] = GetApplication()->GetName();
-	if (uri.scheme == "rtmp") {
+	string scheme = uri.scheme();
+	if (scheme == "rtmp") {
 		parameters[CONF_PROTOCOL] = CONF_PROTOCOL_OUTBOUND_RTMP;
-	} else if (uri.scheme == "rtmpt") {
+	} else if (scheme == "rtmpt") {
 		parameters[CONF_PROTOCOL] = CONF_PROTOCOL_OUTBOUND_RTMPT;
-	} else if (uri.scheme == "rtmpe") {
+	} else if (scheme == "rtmpe") {
 		parameters[CONF_PROTOCOL] = CONF_PROTOCOL_OUTBOUND_RTMPE;
 	} else {
-		FATAL("scheme %s not supported by RTMP handler", STR(uri.scheme));
+		FATAL("scheme %s not supported by RTMP handler", STR(scheme));
 		return false;
 	}
 
 	//3. start the connecting sequence
-	return OutboundRTMPProtocol::Connect(uri.ip, uri.port, parameters);
+	return OutboundRTMPProtocol::Connect(uri.ip(), uri.port(), parameters);
 }
 
-bool BaseRTMPAppProtocolHandler::PushLocalStream(BaseInStream *pInStream, Variant streamConfig) {
-	//1. Prepare the custom parameters
+bool BaseRTMPAppProtocolHandler::PushLocalStream(Variant streamConfig) {
+	//1. get the stream name
+	string streamName = (string) streamConfig["localStreamName"];
+
+	//2. Get the streams manager
+	StreamsManager *pStreamsManager = GetApplication()->GetStreamsManager();
+
+	//3. Search for all streams named streamName having the type of IN_NET
+	map<uint32_t, BaseStream *> streams = pStreamsManager->FindByTypeByName(
+			ST_IN_NET, streamName, true, true);
+	if (streams.size() == 0) {
+		FATAL("Stream %s not found", STR(streamName));
+		return false;
+	}
+
+	//4. See if inside the returned collection of streams
+	//we have something compatible with RTMP
+	BaseInStream *pInStream = NULL;
+
+	FOR_MAP(streams, uint32_t, BaseStream *, i) {
+		if ((MAP_VAL(i)->IsCompatibleWithType(ST_OUT_NET_RTMP_4_RTMP))
+				|| (MAP_VAL(i)->IsCompatibleWithType(ST_OUT_NET_RTMP_4_TS))) {
+			pInStream = (BaseInStream *) MAP_VAL(i);
+			break;
+		}
+	}
+	if (pInStream == NULL) {
+		WARN("Stream %s not found or is incompatible with RTMP output",
+				STR(streamName));
+		return false;
+	}
+
+	//5. Prepare the custom parameters
 	Variant parameters;
 	parameters["customParameters"]["localStreamConfig"] = streamConfig;
 	parameters["customParameters"]["localStreamConfig"]["localUniqueStreamId"] = pInStream->GetUniqueId();
@@ -164,7 +247,7 @@ bool BaseRTMPAppProtocolHandler::PushLocalStream(BaseInStream *pInStream, Varian
 		return false;
 	}
 
-	//2. start the connecting sequence
+	//6. start the connecting sequence
 	return OutboundRTMPProtocol::Connect(
 			streamConfig["targetUri"]["ip"],
 			(uint16_t) streamConfig["targetUri"]["port"],
@@ -293,7 +376,7 @@ bool BaseRTMPAppProtocolHandler::InboundMessageAvailable(BaseRTMPProtocol *pFrom
 		}
 		case RM_HEADER_MESSAGETYPE_ABORTMESSAGE:
 		{
-			return true;
+			return ProcessAbortMessage(pFrom, request);
 		}
 		default:
 		{
@@ -313,44 +396,53 @@ void BaseRTMPAppProtocolHandler::GenerateMetaFiles() {
 		return;
 	}
 
-	string file, name, extension;
+	string file;
+	string name;
+	string extension;
+	string lowercaseExtension;
 
 	FOR_VECTOR_ITERATOR(string, files, i) {
 		file = VECTOR_VAL(i);
 
 		splitFileName(file, name, extension);
-		extension = lowerCase(extension);
+		lowercaseExtension = lowerCase(extension);
 
-		if (extension != MEDIA_TYPE_FLV
-				&& extension != MEDIA_TYPE_MP3
-				&& extension != MEDIA_TYPE_MP4
-				&& extension != MEDIA_TYPE_M4A
-				&& extension != MEDIA_TYPE_M4V
-				&& extension != MEDIA_TYPE_MOV
-				&& extension != MEDIA_TYPE_F4V
-				&& extension != MEDIA_TYPE_NSV)
+		if (lowercaseExtension != MEDIA_TYPE_FLV
+				&& lowercaseExtension != MEDIA_TYPE_MP3
+				&& lowercaseExtension != MEDIA_TYPE_MP4
+				&& lowercaseExtension != MEDIA_TYPE_M4A
+				&& lowercaseExtension != MEDIA_TYPE_M4V
+				&& lowercaseExtension != MEDIA_TYPE_MOV
+				&& lowercaseExtension != MEDIA_TYPE_F4V)
 			continue;
 		string flashName = "";
-		if (extension == MEDIA_TYPE_FLV) {
+		if (lowercaseExtension == MEDIA_TYPE_FLV) {
 			flashName = name;
-		} else if (extension == MEDIA_TYPE_MP3) {
-			flashName = extension + ":" + name;
-		} else if (extension == MEDIA_TYPE_NSV) {
-			flashName = extension + ":" + name;
+		} else if (lowercaseExtension == MEDIA_TYPE_MP3) {
+			flashName = lowercaseExtension + ":" + name;
 		} else {
-			if (extension == MEDIA_TYPE_MP4
-					|| extension == MEDIA_TYPE_M4A
-					|| extension == MEDIA_TYPE_M4V
-					|| extension == MEDIA_TYPE_MOV
-					|| extension == MEDIA_TYPE_F4V) {
+			if (lowercaseExtension == MEDIA_TYPE_MP4
+					|| lowercaseExtension == MEDIA_TYPE_M4A
+					|| lowercaseExtension == MEDIA_TYPE_M4V
+					|| lowercaseExtension == MEDIA_TYPE_MOV
+					|| lowercaseExtension == MEDIA_TYPE_F4V) {
 				flashName = MEDIA_TYPE_MP4":" + name + "." + extension;
 			} else {
-				flashName = extension + ":" + name + "." + extension;
+				flashName = lowercaseExtension + ":" + name + "." + extension;
 			}
 		}
 
 		GetMetaData(flashName, true);
 	}
+}
+
+bool BaseRTMPAppProtocolHandler::ProcessAbortMessage(BaseRTMPProtocol *pFrom,
+		Variant &request) {
+	if (request[RM_ABORTMESSAGE] != _V_NUMERIC) {
+		FATAL("Invalid message: %s", STR(request.ToString()));
+		return false;
+	}
+	return pFrom->ResetChannel((uint32_t) request[RM_ABORTMESSAGE]);
 }
 
 bool BaseRTMPAppProtocolHandler::ProcessWinAckSize(BaseRTMPProtocol *pFrom,
@@ -517,8 +609,14 @@ bool BaseRTMPAppProtocolHandler::ProcessSharedObject(BaseRTMPProtocol *pFrom,
 
 bool BaseRTMPAppProtocolHandler::ProcessInvoke(BaseRTMPProtocol *pFrom,
 		Variant &request) {
-
+	//PROD_ACCESS(CreateLogEventInvoke(pFrom, request));
 	string functionName = request[RM_INVOKE][RM_INVOKE_FUNCTION];
+	uint32_t currentInvokeId = M_INVOKE_ID(request);
+	if (currentInvokeId != 0) {
+		if (_nextInvokeId[pFrom->GetId()] <= currentInvokeId) {
+			_nextInvokeId[pFrom->GetId()] = currentInvokeId + 1;
+		}
+	}
 	if (functionName == RM_INVOKE_FUNCTION_CONNECT) {
 		return ProcessInvokeConnect(pFrom, request);
 	} else if (functionName == RM_INVOKE_FUNCTION_CREATESTREAM) {
@@ -551,6 +649,8 @@ bool BaseRTMPAppProtocolHandler::ProcessInvoke(BaseRTMPProtocol *pFrom,
 		return ProcessInvokeGetStreamLength(pFrom, request);
 	} else if (functionName == RM_INVOKE_FUNCTION_ONBWDONE) {
 		return ProcessInvokeOnBWDone(pFrom, request);
+	} else if (functionName == RM_INVOKE_FUNCTION_CHECKBANDWIDTH) {
+		return ProcessInvokeCheckBandwidth(pFrom, request);
 	} else {
 		return ProcessInvokeGeneric(pFrom, request);
 	}
@@ -577,19 +677,21 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokeConnect(BaseRTMPProtocol *pFrom,
 		return false;
 	}
 
-	//3. Send the connect result and the onBWDone message
+	//3. Send the connect result
 	response = ConnectionMessageFactory::GetInvokeConnectResult(request);
 	if (!SendRTMPMessage(pFrom, response)) {
 		FATAL("Unable to send message to client");
 		return false;
 	}
-	response = GenericMessageFactory::GetInvokeOnBWDone();
+
+	//4. Send onBWDone
+	response = GenericMessageFactory::GetInvokeOnBWDone(1024 * 8);
 	if (!SendRTMPMessage(pFrom, response)) {
 		FATAL("Unable to send message to client");
 		return false;
 	}
 
-	//4. Done
+	//5. Done
 	return true;
 }
 
@@ -611,10 +713,20 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokeCreateStream(BaseRTMPProtocol *pFr
 bool BaseRTMPAppProtocolHandler::ProcessInvokePublish(BaseRTMPProtocol *pFrom,
 		Variant &request) {
 	//1. gather the required data from the request
-	if (M_INVOKE_PARAM(request, 1) != V_STRING) {
+	if ((M_INVOKE_PARAM(request, 1) != V_STRING) && (M_INVOKE_PARAM(request, 1) != V_BOOL)) {
 		FATAL("Invalid request:\n%s", STR(request.ToString()));
 		return false;
 	}
+
+	if (M_INVOKE_PARAM(request, 1) == V_BOOL) {
+		if ((bool)M_INVOKE_PARAM(request, 1) != false) {
+			FATAL("Invalid request:\n%s", STR(request.ToString()));
+			return false;
+		}
+		FINEST("Closing stream via publish(false)");
+		return pFrom->CloseStream(VH_SI(request), true);
+	}
+
 	string streamName = M_INVOKE_PARAM(request, 1);
 
 	//2. Check to see if we are allowed to create inbound streams
@@ -626,33 +738,44 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokePublish(BaseRTMPProtocol *pFrom,
 
 	bool recording = (M_INVOKE_PARAM(request, 2) == RM_INVOKE_PARAMS_PUBLISH_TYPERECORD);
 	bool appending = (M_INVOKE_PARAM(request, 2) == RM_INVOKE_PARAMS_PUBLISH_TYPEAPPEND);
-	FINEST("Try to publish stream %s.%s",
-			STR(streamName), (recording || appending) ? " Also record/append it" : "");
+	//	FINEST("Try to publish stream %s.%s",
+	//			STR(streamName), (recording || appending) ? " Also record/append it" : "");
 
 	//3. Test to see if this stream name is already published somewhere
-	map<uint32_t, BaseStream *> existingStreams =
-			GetApplication()->GetStreamsManager()->FindByTypeByName(
-			ST_IN_NET_RTMP, streamName, false, false);
-	if (existingStreams.size() > 0) {
-		if (!(bool)pFrom->GetCustomParameters()["authState"]["canOverrideStreamName"]) {
-			WARN("Unable to override stream because this connection doesn't have the rights");
+	if (GetApplication()->GetAllowDuplicateInboundNetworkStreams()) {
+		map<uint32_t, BaseStream *> existingStreams =
+				GetApplication()->GetStreamsManager()->FindByTypeByName(
+				ST_IN_NET_RTMP, streamName, false, false);
+		if (existingStreams.size() > 0) {
+			if (!(bool)pFrom->GetCustomParameters()["authState"]["canOverrideStreamName"]) {
+				WARN("Unable to override stream %s because this connection doesn't have the rights",
+						STR(streamName));
+				Variant response = StreamMessageFactory::GetInvokeOnStatusStreamPublishBadName(
+						request, streamName);
+				return pFrom->SendMessage(response);
+			} else {
+
+				FOR_MAP(existingStreams, uint32_t, BaseStream *, i) {
+					InNetRTMPStream *pTempStream = (InNetRTMPStream *) MAP_VAL(i);
+					if (pTempStream->GetProtocol() != NULL) {
+						WARN("Overriding stream R%u:U%u with name %s from connection %u",
+								pTempStream->GetRTMPStreamId(),
+								pTempStream->GetUniqueId(),
+								STR(pTempStream->GetName()),
+								pTempStream->GetProtocol()->GetId());
+						((BaseRTMPProtocol *) pTempStream->GetProtocol())->CloseStream(
+								pTempStream->GetRTMPStreamId(), true);
+					}
+				}
+			}
+		}
+	} else {
+		if (!GetApplication()->StreamNameAvailable(streamName, pFrom)) {
+			WARN("Stream name %s already occupied and application doesn't allow duplicated inbound network streams",
+					STR(streamName));
 			Variant response = StreamMessageFactory::GetInvokeOnStatusStreamPublishBadName(
 					request, streamName);
 			return pFrom->SendMessage(response);
-		} else {
-
-			FOR_MAP(existingStreams, uint32_t, BaseStream *, i) {
-				InNetRTMPStream *pTempStream = (InNetRTMPStream *) MAP_VAL(i);
-				if (pTempStream->GetProtocol() != NULL) {
-					WARN("Overriding stream R%u:U%u with name %s from connection %u",
-							pTempStream->GetRTMPStreamId(),
-							pTempStream->GetUniqueId(),
-							STR(pTempStream->GetName()),
-							pTempStream->GetProtocol()->GetId());
-					((BaseRTMPProtocol *) pTempStream->GetProtocol())->CloseStream(
-							pTempStream->GetRTMPStreamId(), true);
-				}
-			}
 		}
 	}
 
@@ -668,7 +791,7 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokePublish(BaseRTMPProtocol *pFrom,
 	map<uint32_t, BaseOutStream *> subscribedOutStreams =
 			GetApplication()->GetStreamsManager()->GetWaitingSubscribers(
 			streamName, pInNetRTMPStream->GetType());
-	FINEST("subscribedOutStreams count: %"PRIz"u", subscribedOutStreams.size());
+	//FINEST("subscribedOutStreams count: %"PRIz"u", subscribedOutStreams.size());
 
 
 	//7. Bind the waiting subscribers
@@ -804,6 +927,8 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokePlay(BaseRTMPProtocol *pFrom,
 					VH_SI(request),
 					streamName,
 					ST_IN_NET_RTMP);
+			request["waitForLiveStream"] = (bool)true;
+			request["streamName"] = streamName;
 			return pBaseOutNetRTMPStream != NULL;
 		}
 		case -1: //only live
@@ -824,6 +949,8 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokePlay(BaseRTMPProtocol *pFrom,
 					VH_SI(request),
 					streamName,
 					ST_IN_NET_RTMP);
+			request["waitForLiveStream"] = (bool)true;
+			request["streamName"] = streamName;
 			return pBaseOutNetRTMPStream != NULL;
 		}
 		default: //only recorded
@@ -906,26 +1033,36 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokeReleaseStream(BaseRTMPProtocol *pF
 	//1. Attempt to find the stream
 	map<uint32_t, BaseStream *> streams = GetApplication()->GetStreamsManager()->
 			FindByProtocolIdByName(pFrom->GetId(), M_INVOKE_PARAM(request, 1), false);
+	uint32_t streamId = 0;
 	if (streams.size() > 0) {
 		//2. Is this the correct kind?
 		if (TAG_KIND_OF(MAP_VAL(streams.begin())->GetType(), ST_IN_NET_RTMP)) {
 			//3. get the rtmp stream id
 			InNetRTMPStream *pInNetRTMPStream = (InNetRTMPStream *) MAP_VAL(streams.begin());
-			uint32_t streamId = pInNetRTMPStream->GetRTMPStreamId();
+			streamId = pInNetRTMPStream->GetRTMPStreamId();
 
 			//4. close the stream
 			if (!pFrom->CloseStream(streamId, true)) {
 				FATAL("Unable to close stream");
 				return true;
 			}
+		}
+	}
 
-			//5. Send the response
-			Variant response = StreamMessageFactory::GetInvokeReleaseStreamResult(3,
-					streamId, M_INVOKE_ID(request), streamId);
-			if (!pFrom->SendMessage(response)) {
-				FATAL("Unable to send message to client");
-				return false;
-			}
+	if (streamId > 0) {
+		//5. Send the response
+		Variant response = StreamMessageFactory::GetInvokeReleaseStreamResult(3,
+				streamId, M_INVOKE_ID(request), streamId);
+		if (!pFrom->SendMessage(response)) {
+			FATAL("Unable to send message to client");
+			return false;
+		}
+	} else {
+		Variant response =
+				StreamMessageFactory::GetInvokeReleaseStreamErrorNotFound(request);
+		if (!pFrom->SendMessage(response)) {
+			FATAL("Unable to send message to client");
+			return false;
 		}
 	}
 
@@ -978,6 +1115,12 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokeOnStatus(BaseRTMPProtocol *pFrom,
 		if (M_INVOKE_PARAM(request, 1)["code"] != "NetStream.Play.Start") {
 			WARN("onStatus message ignored:\n%s", STR(request.ToString()));
 			return true;
+		}
+		if (!GetApplication()->StreamNameAvailable(parameters["localStreamName"],
+				pProtocol)) {
+			WARN("Stream name %s already occupied and application doesn't allow duplicated inbound network streams",
+					STR(parameters["localStreamName"]));
+			return false;
 		}
 		InNetRTMPStream *pStream = pProtocol->CreateINS(VH_CI(request),
 				VH_SI(request), parameters["localStreamName"]);
@@ -1071,7 +1214,6 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokeGetStreamLength(BaseRTMPProtocol *
 	Variant response = GenericMessageFactory::GetInvokeResult(request, params);
 	if (!SendRTMPMessage(pFrom, response)) {
 		FATAL("Unable to send message to client");
-
 		return false;
 	}
 	return true;
@@ -1079,7 +1221,23 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokeGetStreamLength(BaseRTMPProtocol *
 
 bool BaseRTMPAppProtocolHandler::ProcessInvokeOnBWDone(BaseRTMPProtocol *pFrom,
 		Variant &request) {
-	WARN("ProcessInvokeOnBWDone");
+	//WARN("ProcessInvokeOnBWDone");
+	return true;
+}
+
+bool BaseRTMPAppProtocolHandler::ProcessInvokeCheckBandwidth(BaseRTMPProtocol *pFrom,
+		Variant &request) {
+	if (!_enableCheckBandwidth) {
+		WARN("checkBandwidth is disabled.");
+		return true;
+	}
+	if (!SendRTMPMessage(pFrom, _onBWCheckMessage, true)) {
+		FATAL("Unable to send message to flash player");
+		return false;
+	}
+	double temp;
+	GETCLOCKS(temp);
+	pFrom->GetCustomParameters()["lastOnnBWCheckMessage"] = temp;
 	return true;
 }
 
@@ -1087,8 +1245,8 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokeGeneric(BaseRTMPProtocol *pFrom,
 		Variant & request) {
 	WARN("Default implementation of ProcessInvokeGeneric: Request: %s",
 			STR(M_INVOKE_FUNCTION(request)));
-
-	return true;
+	Variant response = GenericMessageFactory::GetInvokeCallFailedError(request);
+	return SendRTMPMessage(pFrom, response);
 }
 
 bool BaseRTMPAppProtocolHandler::ProcessInvokeResult(BaseRTMPProtocol *pFrom,
@@ -1103,13 +1261,15 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokeResult(BaseRTMPProtocol *pFrom,
 
 bool BaseRTMPAppProtocolHandler::ProcessInvokeResult(BaseRTMPProtocol *pFrom,
 		Variant &request, Variant & response) {
-	string functionName = request[RM_INVOKE][RM_INVOKE_FUNCTION];
+	string functionName = M_INVOKE_FUNCTION(request);
 	if (functionName == RM_INVOKE_FUNCTION_CONNECT) {
 		return ProcessInvokeConnectResult(pFrom, request, response);
 	} else if (functionName == RM_INVOKE_FUNCTION_CREATESTREAM) {
 		return ProcessInvokeCreateStreamResult(pFrom, request, response);
 	} else if (functionName == RM_INVOKE_FUNCTION_FCSUBSCRIBE) {
 		return ProcessInvokeFCSubscribeResult(pFrom, request, response);
+	} else if (functionName == RM_INVOKE_FUNCTION_ONBWCHECK) {
+		return ProcessInvokeOnBWCheckResult(pFrom, request, response);
 	} else {
 		return ProcessInvokeGenericResult(pFrom, request, response);
 	}
@@ -1191,12 +1351,9 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokeConnectResult(BaseRTMPProtocol *pF
 
 	if (NeedsToPullExternalStream(pFrom)) {
 		Variant &parameters = pFrom->GetCustomParameters()["customParameters"]["externalStreamConfig"];
-		Variant params;
-		params.PushToArray(Variant());
-		params.PushToArray(parameters["uri"]["document"]);
 
 		Variant FCSubscribeRequest = StreamMessageFactory::GetInvokeFCSubscribe(
-				parameters["uri"]["document"]);
+				parameters["uri"]["documentWithFullParameters"]);
 		if (!SendRTMPMessage(pFrom, FCSubscribeRequest, true)) {
 			FATAL("Unable to send request:\n%s", STR(FCSubscribeRequest.ToString()));
 			return false;
@@ -1269,7 +1426,7 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokeCreateStreamResult(BaseRTMPProtoco
 	Variant publishPlayRequest;
 	if (NeedsToPullExternalStream(pFrom)) {
 		publishPlayRequest = StreamMessageFactory::GetInvokePlay(3, rtmpStreamId,
-				parameters["uri"]["document"], -2, -1);
+				parameters["uri"]["documentWithFullParameters"], -2, -1);
 	} else {
 		string targetStreamType = "";
 		if (parameters["targetStreamType"] == V_STRING) {
@@ -1297,6 +1454,17 @@ bool BaseRTMPAppProtocolHandler::ProcessInvokeCreateStreamResult(BaseRTMPProtoco
 bool BaseRTMPAppProtocolHandler::ProcessInvokeFCSubscribeResult(BaseRTMPProtocol *pFrom,
 		Variant &request, Variant &response) {
 	return true;
+}
+
+bool BaseRTMPAppProtocolHandler::ProcessInvokeOnBWCheckResult(BaseRTMPProtocol *pFrom,
+		Variant &request, Variant &response) {
+	double now;
+	GETCLOCKS(now);
+	double startTime = (double) pFrom->GetCustomParameters()["lastOnnBWCheckMessage"];
+	double totalTime = (now - startTime) / (double) CLOCKS_PER_SECOND;
+	double speed = (double) ONBWCHECK_SIZE / totalTime / 1024.0 * 8.0;
+	Variant message = GenericMessageFactory::GetInvokeOnBWDone(speed);
+	return SendRTMPMessage(pFrom, message);
 }
 
 bool BaseRTMPAppProtocolHandler::ProcessInvokeGenericResult(BaseRTMPProtocol *pFrom,
@@ -1350,9 +1518,6 @@ bool BaseRTMPAppProtocolHandler::AuthenticateInboundAdobe(BaseRTMPProtocol *pFro
 		return true;
 	}
 	string flashVer = (string) connectParams[RM_INVOKE_PARAMS_CONNECT_FLASHVER];
-
-	//5. Do we have a list of encoder agents?
-	_adobeAuthSettings = _configuration[CONF_APPLICATION_AUTH];
 
 	//6. test the flash ver against the allowed encoder agents
 	if (!_adobeAuthSettings[CONF_APPLICATION_AUTH_ENCODER_AGENTS].HasKey(flashVer)) {
@@ -1500,40 +1665,38 @@ bool BaseRTMPAppProtocolHandler::AuthenticateInboundAdobe(BaseRTMPProtocol *pFro
 }
 
 string BaseRTMPAppProtocolHandler::GetAuthPassword(string user) {
-	string usersFile = _configuration[CONF_APPLICATION_AUTH][CONF_APPLICATION_AUTH_USERS_FILE];
+#ifndef HAS_LUA
+	ASSERT("Lua is not supported by the current build of the server. Adobe authentication needs lua support");
+	return "";
+#endif
+	string usersFile = _adobeAuthSettings[CONF_APPLICATION_AUTH_USERS_FILE];
 	string fileName;
 	string extension;
 	splitFileName(usersFile, fileName, extension);
-	Variant users;
 
-	if (lowerCase(extension) == "xml") {
-		if (!Variant::DeserializeFromXmlFile(usersFile, users)) {
-			FATAL("Unable to read users file: `%s`", STR(usersFile));
-			return "";
-		}
-	} else if (lowerCase(extension) == "lua") {
-#ifdef HAS_LUA
-		if (!ReadLuaFile(usersFile, "users", users)) {
-			FATAL("Unable to read users file: `%s`", STR(usersFile));
-			return "";
-		}
-#else
-		ASSERT("Lua is not supported by the current build of the server");
-		return "";
-#endif /* HAS_LUA */
-	} else {
-		FATAL("Invalid file format: %s", STR(usersFile));
+	double modificationDate = getFileModificationDate(usersFile);
+	if (modificationDate == 0) {
+		FATAL("Unable to get last modification date for file %s", STR(usersFile));
 		return "";
 	}
 
-	if ((VariantType) users != V_MAP) {
+	if (modificationDate != _lastUsersFileUpdate) {
+		_users.Reset();
+		if (!ReadLuaFile(usersFile, "users", _users)) {
+			FATAL("Unable to read users file: `%s`", STR(usersFile));
+			return "";
+		}
+		_lastUsersFileUpdate = modificationDate;
+	}
+
+	if ((VariantType) _users != V_MAP) {
 		FATAL("Invalid users file: `%s`", STR(usersFile));
 		return "";
 	}
 
-	if (users.HasKey(user)) {
-		if ((VariantType) users[user] == V_STRING) {
-			return users[user];
+	if (_users.HasKey(user)) {
+		if ((VariantType) _users[user] == V_STRING) {
+			return _users[user];
 		} else {
 			FATAL("Invalid users file: `%s`", STR(usersFile));
 			return "";
@@ -1607,18 +1770,38 @@ Variant BaseRTMPAppProtocolHandler::GetMetaData(string streamName,
 	//cache it after that
 	string metaPath = (string) result[META_SERVER_FULL_PATH] + "."MEDIA_TYPE_META;
 	string seekPath = (string) result[META_SERVER_FULL_PATH] + "."MEDIA_TYPE_SEEK;
+	bool regenerateFiles = true;
 	if (fileExists(metaPath) && fileExists(seekPath)) {
-		if (getFileModificationDate(metaPath) >= getFileModificationDate(result[META_SERVER_FULL_PATH])) {
-			if (!Variant::DeserializeFromXmlFile(metaPath, result)) {
-				WARN("Unable to deserialize the meta file %s. Rebuilding it", STR(metaPath));
-			} else {
-				result[META_REQUESTED_STREAM_NAME] = streamName;
-				return result;
-			}
-		} else {
-			WARN("Media file modified: %s. The *.seek and *.meta file will be recreated",
-					STR(result[META_SERVER_FULL_PATH]));
+		StreamCapabilities capabilities;
+		string originalServerFullPath = result[META_SERVER_FULL_PATH];
+		regenerateFiles =
+				(getFileModificationDate(metaPath) < getFileModificationDate(result[META_SERVER_FULL_PATH]))
+				|| (getFileModificationDate(seekPath) < getFileModificationDate(result[META_SERVER_FULL_PATH]))
+				|| (!Variant::DeserializeFromXmlFile(metaPath, result))
+				|| (!StreamCapabilities::Deserialize(seekPath, capabilities));
+		regenerateFiles |=
+				(!result.HasKeyChain(V_STRING, false, 1, META_SERVER_FULL_PATH))
+				|| ((string) result[META_SERVER_FULL_PATH] != originalServerFullPath)
+				|| (!result.HasKeyChain(V_BOOL, false, 1, CONF_APPLICATION_KEYFRAMESEEK))
+				|| ((bool) result[CONF_APPLICATION_KEYFRAMESEEK] != _keyframeSeek)
+				|| (!result.HasKeyChain(V_INT32, false, 1, CONF_APPLICATION_CLIENTSIDEBUFFER))
+				|| ((int32_t) result[CONF_APPLICATION_CLIENTSIDEBUFFER] != _clientSideBuffer)
+				|| (!result.HasKeyChain(V_UINT32, false, 1, CONF_APPLICATION_SEEKGRANULARITY))
+				|| ((uint32_t) result[CONF_APPLICATION_SEEKGRANULARITY] != _seekGranularity);
+		if (regenerateFiles) {
+			result[META_SERVER_FULL_PATH] = originalServerFullPath;
+			result[CONF_APPLICATION_KEYFRAMESEEK] = (bool)_keyframeSeek;
+			result[CONF_APPLICATION_CLIENTSIDEBUFFER] = (int32_t) _clientSideBuffer;
+			result[CONF_APPLICATION_SEEKGRANULARITY] = _seekGranularity;
 		}
+	}
+
+	if (!regenerateFiles) {
+		result[META_REQUESTED_STREAM_NAME] = streamName;
+		return result;
+	} else {
+		FINEST("Generate seek/meta for file %s", STR(result[META_SERVER_FULL_PATH]));
+
 	}
 
 	//8. We either have a bad meta file or we don't have it at all. Build it
@@ -1653,7 +1836,11 @@ bool BaseRTMPAppProtocolHandler::SendRTMPMessage(BaseRTMPProtocol *pTo,
 					invokeId = _nextInvokeId[pTo->GetId()];
 					_nextInvokeId[pTo->GetId()] = invokeId + 1;
 					M_INVOKE_ID(message) = invokeId;
-					_resultMessageTracking[pTo->GetId()][invokeId] = message;
+					//do not store stupid useless amount of data needed by onbwcheck
+					if (M_INVOKE_FUNCTION(message) == RM_INVOKE_FUNCTION_ONBWCHECK)
+						_resultMessageTracking[pTo->GetId()][invokeId] = _onBWCheckStrippedMessage;
+					else
+						_resultMessageTracking[pTo->GetId()][invokeId] = message;
 				} else {
 					M_INVOKE_ID(message) = (uint32_t) 0;
 				}
@@ -1676,6 +1863,14 @@ bool BaseRTMPAppProtocolHandler::SendRTMPMessage(BaseRTMPProtocol *pTo,
 			return false;
 		}
 	}
+}
+
+string NormalizeStreamName(string streamName) {
+	replace(streamName, "-", "_");
+	replace(streamName, "?", "-");
+	replace(streamName, "&", "-");
+	replace(streamName, "=", "-");
+	return streamName;
 }
 
 bool BaseRTMPAppProtocolHandler::TryLinkToLiveStream(BaseRTMPProtocol *pFrom,
@@ -1705,7 +1900,20 @@ bool BaseRTMPAppProtocolHandler::TryLinkToLiveStream(BaseRTMPProtocol *pFrom,
 	}
 
 	//5. Get the first stream in the inboundStreams
-	BaseInNetStream *pBaseInNetStream = (BaseInNetStream *) MAP_VAL(inboundStreams.begin());
+	BaseInNetStream *pBaseInNetStream = NULL;
+
+	FOR_MAP(inboundStreams, uint32_t, BaseStream *, i) {
+		BaseInNetStream *pTemp = (BaseInNetStream *) MAP_VAL(i);
+		if ((!pTemp->IsCompatibleWithType(ST_OUT_NET_RTMP_4_TS))
+				&& (!pTemp->IsCompatibleWithType(ST_OUT_NET_RTMP_4_RTMP)))
+			continue;
+		pBaseInNetStream = pTemp;
+		break;
+	}
+	if (pBaseInNetStream == NULL) {
+		WARN("No live streams found: `%s` or `%s`", STR(streamName), STR(shortName));
+		return true;
+	}
 
 	//6. Create the outbound stream
 	BaseOutNetRTMPStream * pBaseOutNetRTMPStream = pFrom->CreateONS(streamId,
@@ -1810,7 +2018,7 @@ bool BaseRTMPAppProtocolHandler::PullExternalStream(BaseRTMPProtocol *pFrom) {
 	Variant &streamConfig = pFrom->GetCustomParameters()["customParameters"]["externalStreamConfig"];
 
 	//2. Issue the connect invoke
-	return ConnectForPullPush(pFrom, "uri", streamConfig);
+	return ConnectForPullPush(pFrom, "uri", streamConfig, true);
 }
 
 bool BaseRTMPAppProtocolHandler::PushLocalStream(BaseRTMPProtocol *pFrom) {
@@ -1818,56 +2026,63 @@ bool BaseRTMPAppProtocolHandler::PushLocalStream(BaseRTMPProtocol *pFrom) {
 	Variant &streamConfig = pFrom->GetCustomParameters()["customParameters"]["localStreamConfig"];
 
 	//2. Issue the connect invoke
-	return ConnectForPullPush(pFrom, "targetUri", streamConfig);
+	return ConnectForPullPush(pFrom, "targetUri", streamConfig, false);
 }
 
 bool BaseRTMPAppProtocolHandler::ConnectForPullPush(BaseRTMPProtocol *pFrom,
-		string uriPath, Variant &streamConfig) {
+		string uriPath, Variant &streamConfig, bool isPull) {
 	URI uri;
 	if (!URI::FromVariant(streamConfig[uriPath], uri)) {
-		FATAL("Unable to parse uri:\n%s", STR(streamConfig["targetUri"]));
+		FATAL("Unable to parse uri:\n%s", STR(streamConfig["targetUri"].ToString()));
 		return false;
 	}
 
 	//2. get the application name
-	string appName = uri.documentPath;
-	if (appName == "/")
-		appName = uri.document;
+	string appName = "";
+	if (isPull) {
+		appName = uri.documentPath();
+	} else {
+		appName = uri.fullDocumentPathWithParameters();
+	}
 	if (appName != "") {
 		if (appName[0] == '/')
 			appName = appName.substr(1, appName.size() - 1);
+		if (appName != "") {
+			if (appName[appName.size() - 1] == '/')
+				appName = appName.substr(0, appName.size() - 1);
+		}
 	}
 	if (appName == "") {
-		FATAL("Invalid uri: %s", STR(uri.fullUri));
+		FATAL("Invalid uri: %s", STR(uri.fullUri()));
 		return false;
 	}
-	if (uri.userName != "") {
+	if (uri.userName() != "") {
 		if (streamConfig.HasKey("auth")) {
-			string user = uri.userName;
-			string password = uri.password;
+			string user = uri.userName();
+			string password = uri.password();
 			string salt = streamConfig["auth"]["salt"];
 			string opaque = streamConfig["auth"]["opaque"];
 			string challenge = streamConfig["auth"]["challenge"];
 			string response = b64(md5(b64(md5(user + salt + password, false)) + opaque + challenge, false));
 			appName = appName + "?authmod=adobe"
-					+ "&user=" + uri.userName
+					+ "&user=" + uri.userName()
 					+ "&challenge=" + challenge
 					+ "&opaque=" + opaque
 					+ "&salt=" + salt
 					+ "&response=" + response;
 			streamConfig["emulateUserAgent"] = "FMLE/3.0 (compatible; FMSc/1.0)";
 		} else {
-			appName = appName + "?authmod=adobe&user=" + uri.userName;
+			appName = appName + "?authmod=adobe&user=" + uri.userName();
 			streamConfig["emulateUserAgent"] = "FMLE/3.0 (compatible; FMSc/1.0)";
 		}
 	}
 
-	//3. Compute tcUrl: rtmp://host/appName
-	string tcUrl = format("%s://%s%s/%s",
-			STR(uri.scheme),
-			STR(uri.host),
-			STR(uri.port == 1935 ? "" : format(":%hu", uri.port)),
-			STR(appName));
+//	//3. Compute tcUrl: rtmp://host/appName
+//	string tcUrl = format("%s://%s%s/%s",
+//			STR(uri.scheme()),
+//			STR(uri.host()),
+//			STR(uri.portSpecified() ? format(":%"PRIu32) : ""),
+//			STR(appName));
 
 	//4. Get the user agent
 	string userAgent = "";
@@ -1879,6 +2094,10 @@ bool BaseRTMPAppProtocolHandler::ConnectForPullPush(BaseRTMPProtocol *pFrom,
 	}
 
 	//5. Get swfUrl and pageUrl
+	string tcUrl = "";
+	if (streamConfig["tcUrl"] == V_STRING) {
+		tcUrl = (string) streamConfig["tcUrl"];
+	}
 	string swfUrl = "";
 	if (streamConfig["swfUrl"] == V_STRING) {
 		swfUrl = (string) streamConfig["swfUrl"];
@@ -1911,5 +2130,5 @@ bool BaseRTMPAppProtocolHandler::ConnectForPullPush(BaseRTMPProtocol *pFrom,
 
 	return true;
 }
-#endif /* HAS_PROTOCOL_RTMP */
 
+#endif /* HAS_PROTOCOL_RTMP */

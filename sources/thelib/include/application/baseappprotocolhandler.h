@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -29,8 +29,8 @@ class BaseInStream;
 
 /*!
 	@class BaseAppProtocolHandler
-	@brief 
-*/
+	@brief
+ */
 class DLLEXP BaseAppProtocolHandler {
 private:
 	BaseClientApplication *_pApplication;
@@ -40,40 +40,42 @@ public:
 	BaseAppProtocolHandler(Variant &configuration);
 	virtual ~BaseAppProtocolHandler();
 
+	virtual bool ParseAuthenticationNode(Variant &node, Variant &result);
+
 	/*!
 		@brief Sets the application.
 		@param pApplication
-	*/
-	void SetApplication(BaseClientApplication *pApplication);
+	 */
+	virtual void SetApplication(BaseClientApplication *pApplication);
 	/*!
 		@brief Sets the pointer to the application.
-	*/
+	 */
 	BaseClientApplication *GetApplication();
 
 	/*!
 		@brief Gets the porotocol handler of the application.
 		@param protocolType - Type of portocol
-	*/
+	 */
 	BaseAppProtocolHandler * GetProtocolHandler(uint64_t protocolType);
 
 	/*!
 		@brief
-	*/
+	 */
 	virtual bool PullExternalStream(URI uri, Variant streamConfig);
 
 	/*!
 		@brief
-	*/
-	virtual bool PushLocalStream(BaseInStream *pInStream, Variant streamConfig);
+	 */
+	virtual bool PushLocalStream(Variant streamConfig);
 
 	/*!
 		@brief
-	*/
+	 */
 	virtual void RegisterProtocol(BaseProtocol *pProtocol) = 0;
 
 	/*!
 		@brief
-	*/
+	 */
 	virtual void UnRegisterProtocol(BaseProtocol *pProtocol) = 0;
 };
 
