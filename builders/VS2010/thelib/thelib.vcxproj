@@ -229,6 +229,7 @@
     <ClCompile Include="..\..\..\sources\thelib\src\mediaformats\mp4\mp4document.cpp" />
     <ClCompile Include="..\..\..\sources\thelib\src\mediaformats\mp4\versionedatom.cpp" />
     <ClCompile Include="..\..\..\sources\thelib\src\mediaformats\mp4\versionedboxatom.cpp" />
+    <ClCompile Include="..\..\..\sources\thelib\src\netio\fdstats.cpp" />
     <ClCompile Include="..\..\..\sources\thelib\src\netio\select\inboundnamedpipecarrier.cpp" />
     <ClCompile Include="..\..\..\sources\thelib\src\netio\select\iohandler.cpp" />
     <ClCompile Include="..\..\..\sources\thelib\src\netio\select\iohandlermanager.cpp" />
@@ -262,6 +263,7 @@
     <ClCompile Include="..\..\..\sources\thelib\src\protocols\rtp\connectivity\inboundconnectivity.cpp" />
     <ClCompile Include="..\..\..\sources\thelib\src\protocols\rtp\connectivity\outboundconnectivity.cpp" />
     <ClCompile Include="..\..\..\sources\thelib\src\protocols\rtp\inboundrtpprotocol.cpp" />
+    <ClCompile Include="..\..\..\sources\thelib\src\protocols\rtp\nattraversalprotocol.cpp" />
     <ClCompile Include="..\..\..\sources\thelib\src\protocols\rtp\rtcpprotocol.cpp" />
     <ClCompile Include="..\..\..\sources\thelib\src\protocols\rtp\rtspprotocol.cpp" />
     <ClCompile Include="..\..\..\sources\thelib\src\protocols\rtp\sdp.cpp" />
@@ -388,6 +390,7 @@
     <ClInclude Include="..\..\..\sources\thelib\include\mediaformats\mp4\mp4document.h" />
     <ClInclude Include="..\..\..\sources\thelib\include\mediaformats\mp4\versionedatom.h" />
     <ClInclude Include="..\..\..\sources\thelib\include\mediaformats\mp4\versionedboxatom.h" />
+    <ClInclude Include="..\..\..\sources\thelib\include\netio\fdstats.h" />
     <ClInclude Include="..\..\..\sources\thelib\include\netio\netio.h" />
     <ClInclude Include="..\..\..\sources\thelib\include\netio\select\inboundnamedpipecarrier.h" />
     <ClInclude Include="..\..\..\sources\thelib\include\netio\select\iohandler.h" />
@@ -424,6 +427,7 @@
     <ClInclude Include="..\..\..\sources\thelib\include\protocols\rtp\connectivity\inboundconnectivity.h" />
     <ClInclude Include="..\..\..\sources\thelib\include\protocols\rtp\connectivity\outboundconnectivity.h" />
     <ClInclude Include="..\..\..\sources\thelib\include\protocols\rtp\inboundrtpprotocol.h" />
+    <ClInclude Include="..\..\..\sources\thelib\include\protocols\rtp\nattraversalprotocol.h" />
     <ClInclude Include="..\..\..\sources\thelib\include\protocols\rtp\rtcpprotocol.h" />
     <ClInclude Include="..\..\..\sources\thelib\include\protocols\rtp\rtpheader.h" />
     <ClInclude Include="..\..\..\sources\thelib\include\protocols\rtp\rtspprotocol.h" />
