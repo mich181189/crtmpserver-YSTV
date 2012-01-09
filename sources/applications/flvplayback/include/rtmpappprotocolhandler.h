@@ -21,7 +21,6 @@
 #ifdef HAS_PROTOCOL_RTMP
 #ifndef _RTMPAPPPROTOCOLHANDLER_H
 #define	_RTMPAPPPROTOCOLHANDLER_H
-
 #include "protocols/rtmp/basertmpappprotocolhandler.h"
 
 #include <pqxx/pqxx>
@@ -34,8 +33,9 @@ namespace app_flvplayback {
 		RTMPAppProtocolHandler(Variant &configuration);
 		virtual ~RTMPAppProtocolHandler();
 
-		virtual bool ProcessInvokeGeneric(BaseRTMPProtocol *pFrom,
-				Variant &request);
+		virtual bool ProcessInvokeGeneric(BaseRTMPProtocol *pFrom,Variant &request);
+		//bool AuthenticateInboundAdobe(BaseRTMPProtocol *pFrom, Variant & request, Variant &authState);
+
 	private:
 		bool ProcessGetAvailableFlvs(BaseRTMPProtocol *pFrom, Variant &request);
 		bool ProcessInsertMetadata(BaseRTMPProtocol *pFrom, Variant &request);

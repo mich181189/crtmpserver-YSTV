@@ -17,7 +17,6 @@
  *  along with crtmpserver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #ifdef HAS_PROTOCOL_RTMP
 #include "rtmpappprotocolhandler.h"
 #include "protocols/rtmp/basertmpprotocol.h"
@@ -79,6 +78,14 @@ RTMPAppProtocolHandler::RTMPAppProtocolHandler(Variant &configuration)
 RTMPAppProtocolHandler::~RTMPAppProtocolHandler() {
 	delete dbconn;
 }
+
+//I disabled auth in the config instead of in the code,hence this is commented out.
+/*//Because we use our own IP-based auth, this isn't needed
+bool RTMPAppProtocolHandler::AuthenticateInboundAdobe(BaseRTMPProtocol *pFrom,
+		Variant & request, Variant &authState) {
+			return true;
+}*/
+
 
 //just something to make our lives a little easier, and so we don't have to stare at that freakin' typecast!
 string getIP(BaseRTMPProtocol *pFrom) {
@@ -245,7 +252,7 @@ bool RTMPAppProtocolHandler::ProcessInvokePublish(BaseRTMPProtocol *pFrom,Varian
                 }
             } catch(const std::exception &e) {
                 FATAL("%s",e.what());
-                return false;//something went wrong, so be mean as a safe option.
+                // false;//something went wrong, so be mean as a safe option.
             }
         }
         if(allowed) {
