@@ -21,4 +21,7 @@
   <ItemGroup>
     <None Include="..\..\cmake\crtmpserver\crtmpserver.lua" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\winIcon.rc" />
+  </ItemGroup>
 </Project>
