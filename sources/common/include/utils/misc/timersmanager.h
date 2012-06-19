@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -37,7 +37,7 @@ typedef void (*ProcessTimerEvent)(TimerEvent &event);
 
 /*!
 	@class TimersManager
-*/
+ */
 class DLLEXP TimersManager {
 private:
 	uint32_t _currentSlotIndex;
@@ -47,6 +47,8 @@ private:
 	ProcessTimerEvent _processTimerEvent;
 	vector<uint32_t> _periodsVector;
 	map<uint32_t, uint32_t> _periodsMap;
+	bool _inExecution;
+	vector<uint32_t> _pendingForRemoval;
 public:
 	TimersManager(ProcessTimerEvent processTimerEvent);
 	virtual ~TimersManager();
@@ -54,20 +56,20 @@ public:
 	/*!
 		@brief Erases the timer designated by its ID
 		@param eventTimerId - Id of the timer to be erased
-	*/	
+	 */
 	void RemoveTimer(uint32_t eventTimerId);
 
 	/*!
 		@brief Adds a timer event
 		@param timerEvent
 
-	*/
+	 */
 	void AddTimer(TimerEvent &timerEvent);
 
 	/*!
 		@brief Updates the timer event based on the time elapsed
 		@param currentTime - Value of the time in the timer at the time the function is called. This value is used to calculate the elapsed time.
-	*/
+	 */
 	void TimeElapsed(uint64_t currentTime);
 private:
 	void UpdatePeriods(uint32_t period);

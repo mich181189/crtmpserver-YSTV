@@ -17,9 +17,6 @@
  *  along with crtmpserver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "netio/kqueue/iohandlermanager.h"
-
-
 #ifdef HAS_PROTOCOL_CLI
 #include "protocols/cli/inboundbasecliprotocol.h"
 #include "application/clientapplicationmanager.h"

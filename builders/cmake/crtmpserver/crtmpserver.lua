@@ -64,7 +64,7 @@ configuration=
 			
 			-- Tells the server to validate the clien's handshake before going further. 
 			-- It is optional, defaulted to true
-			validateHandshake=true,
+			validateHandshake=false,
 			-- this is the folder from where the current application gets it's content.
 			-- It is optional. If not specified, it will be defaulted to:
 			-- <rootDirectory>/<name>/mediaFolder
@@ -106,11 +106,12 @@ configuration=
 			name="flvplayback",
 			protocol="dynamiclinklibrary",
 			dbHost="DB Host",
+
                         dbUser="Username",
                         dbPass="Password",
                         db="Db Name",
 
-			mediaFolder="/Volumes/android/backup/media/",
+			mediaFolder="/Volumes/Storage/media/mp4",
 
 			aliases=
 			{
@@ -164,12 +165,13 @@ configuration=
 				{
 					uri="rtmp://edge01.fms.dutchview.nl/botr/bunny",
 					localStreamName="rtmp_test",
-					swfUrl="http://www.example.com/example.swf";
-					pageUrl="http://www.example.com/";
+					swfUrl="http://www.example.com/example.swf",
+					pageUrl="http://www.example.com/",
+					tcUrl="rtmp://edge01.fms.dutchview.nl/botr/bunny", --this one is usually required and should have the same value as the uri
 					emulateUserAgent="MAC 10,1,82,76",
 				}]]--
 			},
-			validateHandshake=true,
+			validateHandshake=false,
 			keyframeSeek=true,
 			seekGranularity=1.5, --in seconds, between 0.1 and 600
 			clientSideBuffer=12, --in seconds, between 5 and 30
@@ -212,8 +214,8 @@ configuration=
 					port=8988,
 					protocol="echoProtocol"
 				}
-			}
-			--validateHandshake=true,
+			},
+			validateHandshake=false,
 			--default=true,
 		},
 		{
@@ -233,8 +235,8 @@ configuration=
 					port=1111,
 					protocol="inboundHttpXmlVariant"
 				}
-			}
-			--validateHandshake=true,
+			},
+			validateHandshake=false,
 			--default=true,
 		},
 		{
@@ -255,8 +257,8 @@ configuration=
 					protocol="inboundJsonCli",
 					useLengthPadding=true
 				},
-			}
-			--validateHandshake=true,
+			},
+			validateHandshake=false,
 			--default=true,
 		},
 		{
@@ -276,28 +278,28 @@ configuration=
 			{
 				--[[{
 					targetUri="rtmp://x.xxxxxxx.fme.ustream.tv/ustreamVideo/xxxxxxx",
-					targetStreamName="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-					localStreamName="gigi",
+					targetStreamName="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+					localStreamName="stream1",
 					emulateUserAgent="FMLE/3.0 (compatible; FMSc/1.0 http://www.rtmpd.com)"
 				}]]--,
-				{
+				--[[{
 					targetUri="rtmp://gigi:spaima@localhost/vod",
 					targetStreamType="live", -- (live, record or append)
 					emulateUserAgent="My user agent",
 					localStreamName="stream1",
 					keepAlive=true
-				},
+				},]]--
 			},
-			--[[externalStreams = 
+			externalStreams = 
 			{
-				{
+				--[[{
 					uri="rtsp://fms20.mediadirect.ro/live2/realitatea/realitatea",
 					localStreamName="stream1",
 					forceTcp=true,
 					keepAlive=true
-				},
-			},]]--
-			--validateHandshake=true,
+				},]]--
+			},
+			validateHandshake=false,
 			--default=true,
 		},
 		{
@@ -322,25 +324,6 @@ configuration=
 			},
 			numberOfConnections=10,
 			randomAccessStreams=false
-		},
-		{
-			name="applestreamingclient",
-			description="Apple Streaming Client",
-			protocol="dynamiclinklibrary",
-			--[[acceptors = 
-			{
-				{
-					ip="0.0.0.0",
-					port=5544,
-					protocol="inboundRtsp"
-				}
-			},]]--
-			aliases=
-			{
-				"asc",
-			},
-			--validateHandshake=true,
-			--default=true,
 		},
 		--[[{
 			name="vmapp",

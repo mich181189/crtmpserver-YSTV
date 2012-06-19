@@ -234,7 +234,7 @@ bool IOBuffer::ReadFromInputBuffer(const IOBuffer &buffer, uint32_t size) {
 
 bool IOBuffer::ReadFromString(string binary) {
 	SANITY_INPUT_BUFFER;
-	if (!ReadFromBuffer((uint8_t *) binary.c_str(), (uint32_t) binary.length())) {
+	if (!ReadFromBuffer((uint8_t *) binary.data(), (uint32_t) binary.length())) {
 		SANITY_INPUT_BUFFER;
 		return false;
 	}
@@ -425,7 +425,7 @@ bool IOBuffer::EnsureSize(uint32_t expected) {
 	return true;
 }
 
-string IOBuffer::DumpBuffer(uint8_t *pBuffer, uint32_t length) {
+string IOBuffer::DumpBuffer(const uint8_t *pBuffer, uint32_t length) {
 	IOBuffer temp;
 	temp.ReadFromBuffer(pBuffer, length);
 	return temp.ToString();

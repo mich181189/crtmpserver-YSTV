@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -30,6 +30,7 @@
 //variant protocols
 #define PT_BIN_VAR				MAKE_TAG4('B','V','A','R')
 #define PT_XML_VAR				MAKE_TAG4('X','V','A','R')
+#define PT_JSON_VAR				MAKE_TAG4('J','V','A','R')
 
 //RTMP protocols
 #define PT_INBOUND_RTMP			MAKE_TAG2('I','R')
@@ -78,6 +79,9 @@
 
 //Raw HTTP stream
 #define PT_INBOUND_RAW_HTTP_STREAM		MAKE_TAG4('I','R','H','S')
+
+//pass through protocol
+#define PT_PASSTHROUGH MAKE_TAG2('P','T')
 
 #endif	/* _PROTOCOLTYPES_H */
 

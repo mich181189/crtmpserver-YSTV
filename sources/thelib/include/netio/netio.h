@@ -53,7 +53,11 @@
 #include "netio/epoll/tcpconnector.h"
 #include "netio/epoll/inboundnamedpipecarrier.h"
 #include "netio/epoll/stdiocarrier.h"
-#define NETWORK_REACTOR "epoll"
+#ifdef HAS_EPOLL_TIMERS
+#define NETWORK_REACTOR "epoll with timerfd_XXXX support"
+#else
+#define NETWORK_REACTOR "epoll without timerfd_XXXX support"
+#endif
 #endif
 
 #ifdef NET_SELECT
@@ -72,26 +76,12 @@
 #ifdef NET_IOCP
 #include "netio/iocp/iohandler.h"
 #include "netio/iocp/iohandlermanager.h"
-#include "netio/iocp/iohandlermanagertoken.h"
 #include "netio/iocp/iotimer.h"
 #include "netio/iocp/tcpacceptor.h"
 #include "netio/iocp/tcpcarrier.h"
 #include "netio/iocp/udpcarrier.h"
 #include "netio/iocp/tcpconnector.h"
 #define NETWORK_REACTOR "iocp"
-#endif
-
-#ifdef NET_IOCP2
-#include "netio/iocp2/iohandler.h"
-#include "netio/iocp2/iohandlermanager.h"
-#include "netio/iocp2/iohandlermanagertoken.h"
-#include "netio/iocp2/iotimer.h"
-#include "netio/iocp2/tcpacceptor.h"
-#include "netio/iocp2/tcpcarrier.h"
-#include "netio/iocp2/udpcarrier.h"
-#include "netio/iocp2/tcpconnector.h"
-#include "netio/iocp2/stdiocarrier.h"
-#define NETWORK_REACTOR "iocp2"
 #endif
 
 #endif	/* _NETIO_H */

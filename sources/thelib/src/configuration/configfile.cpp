@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -164,20 +164,6 @@ bool ConfigFile::ConfigInstances() {
 		return true;
 	}
 
-	for (int32_t i = 0; i < instancesCount; i++) {
-		pid_t pid = fork();
-		if (pid < 0) {
-			FATAL("Unable to start child instance. fork() failed");
-			return false;
-		}
-
-		if (pid == 0) {
-			_isOrigin = false;
-			Logger::SignalFork();
-			break;
-		}
-	}
-
 	FOR_MAP(_modules, string, Module, i) {
 		MAP_VAL(i).config["isOrigin"] = (bool)_isOrigin;
 	}
@@ -208,16 +194,16 @@ bool ConfigFile::ConfigApplications() {
 
 bool ConfigFile::ConfigLogAppender(Variant &node) {
 	BaseLogLocation *pLogLocation = NULL;
-	if ((string) node[CONF_LOG_APPENDER_TYPE] == CONF_LOG_APPENDER_TYPE_COLORED_CONSOLE) {
+	if (node[CONF_LOG_APPENDER_TYPE] == CONF_LOG_APPENDER_TYPE_COLORED_CONSOLE) {
 		node[CONF_LOG_APPENDER_COLORED] = (bool)true;
 		if (!IsDaemon()) {
 			pLogLocation = new ConsoleLogLocation(node);
 		}
-	} else if ((string) node[CONF_LOG_APPENDER_TYPE] == CONF_LOG_APPENDER_TYPE_CONSOLE) {
+	} else if (node[CONF_LOG_APPENDER_TYPE] == CONF_LOG_APPENDER_TYPE_CONSOLE) {
 		if (!IsDaemon()) {
 			pLogLocation = new ConsoleLogLocation(node);
 		}
-	} else if ((string) node[CONF_LOG_APPENDER_TYPE] == CONF_LOG_APPENDER_TYPE_FILE) {
+	} else if (node[CONF_LOG_APPENDER_TYPE] == CONF_LOG_APPENDER_TYPE_FILE) {
 		pLogLocation = new FileLogLocation(node);
 	} else {
 		NYIR;
@@ -520,7 +506,7 @@ bool ConfigFile::NormalizeApplication(Variant &node) {
 				FATAL("Invalid alias value:\n%s", STR(MAP_VAL(i).ToString()));
 				return false;
 			}
-			if ((string) MAP_VAL(i) == "") {
+			if (MAP_VAL(i) == "") {
 				FATAL("Invalid alias value:\n%s", STR(MAP_VAL(i).ToString()));
 				return false;
 			}

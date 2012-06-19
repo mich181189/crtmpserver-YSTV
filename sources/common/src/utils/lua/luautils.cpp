@@ -1,4 +1,4 @@
-/* 
+/*
  *  Copyright (c) 2010,
  *  Gavriloaie Eugen-Andrei (shiretu@gmail.com)
  *
@@ -19,6 +19,10 @@
 
 
 #ifdef HAS_LUA
+extern "C" {
+#include <lualib.h>
+#include <lauxlib.h>
+}
 #include "utils/lua/luautils.h"
 #include "utils/logging/logging.h"
 
@@ -188,7 +192,7 @@ bool PushVariant(lua_State *pLuaState,
 			lua_settable(pLuaState, -3);
 
 			lua_pushstring(pLuaState, VAR_MONTH);
-			lua_pushnumber(pLuaState, tempTm.tm_mon+1);
+			lua_pushnumber(pLuaState, tempTm.tm_mon + 1);
 			lua_settable(pLuaState, -3);
 
 			lua_pushstring(pLuaState, VAR_DAY);
@@ -196,7 +200,7 @@ bool PushVariant(lua_State *pLuaState,
 			lua_settable(pLuaState, -3);
 
 			lua_pushstring(pLuaState, VAR_HOUR);
-			lua_pushnumber(pLuaState, tempTm.tm_hour);
+			lua_pushnumber(pLuaState, tempTm.tm_hour + 1);
 			lua_settable(pLuaState, -3);
 
 			lua_pushstring(pLuaState, VAR_MIN);
@@ -229,7 +233,7 @@ bool PushVariant(lua_State *pLuaState,
 			lua_settable(pLuaState, -3);
 
 			lua_pushstring(pLuaState, VAR_MONTH);
-			lua_pushnumber(pLuaState, tempTm.tm_mon);
+			lua_pushnumber(pLuaState, tempTm.tm_mon + 1);
 			lua_settable(pLuaState, -3);
 
 			lua_pushstring(pLuaState, VAR_DAY);
@@ -261,7 +265,7 @@ bool PushVariant(lua_State *pLuaState,
 			lua_settable(pLuaState, -3);
 
 			lua_pushstring(pLuaState, VAR_HOUR);
-			lua_pushnumber(pLuaState, tempTm.tm_hour);
+			lua_pushnumber(pLuaState, tempTm.tm_hour + 1);
 			lua_settable(pLuaState, -3);
 
 			lua_pushstring(pLuaState, VAR_MIN);
@@ -291,18 +295,14 @@ bool PushVariant(lua_State *pLuaState,
 			}
 
 			FOR_MAP(variant, string, Variant, i) {
-				if (MAP_KEY(i).find(VAR_INDEX_VALUE) == 0) {
-					string temp = MAP_KEY(i).substr(VAR_INDEX_VALUE_LEN,
-							string::npos);
-					char *error = NULL;
-					double index = strtod(STR(temp), &error);
-					if (error == STR(temp) + temp.size()) {
-						lua_pushnumber(pLuaState, index);
-					} else {
-						lua_pushstring(pLuaState, STR(MAP_KEY(i)));
-					}
+				const char *pKey = MAP_KEY(i).c_str();
+				if ((MAP_KEY(i).length() == 10)
+						&& (pKey[0] == '0')
+						&& (pKey[1] == 'x')) {
+					uint32_t index = (uint32_t) strtol(pKey, NULL, 16);
+					lua_pushnumber(pLuaState, index);
 				} else {
-					lua_pushstring(pLuaState, STR(MAP_KEY(i)));
+					lua_pushstring(pLuaState, pKey);
 				}
 				if (!PushVariant(pLuaState, MAP_VAL(i), true)) {
 					FINEST("Unable to push primitive");
@@ -315,12 +315,11 @@ bool PushVariant(lua_State *pLuaState,
 		}
 		default:
 		{
-			FATAL("Unknown type %hhu", (VariantType) variant);
+			FATAL("Unknown type %d", (VariantType) variant);
 			return false;
 			break;
 		}
 	}
-	return true;
 }
 
 bool EvalLuaExpression(lua_State *pLuaState, string expression) {

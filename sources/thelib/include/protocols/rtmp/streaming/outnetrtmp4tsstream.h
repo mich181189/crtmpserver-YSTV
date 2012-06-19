@@ -28,6 +28,7 @@ class DLLEXP OutNetRTMP4TSStream
 : public BaseOutNetRTMPStream {
 private:
 	bool _audioCodecSent;
+	bool _audioIsG711;
 	bool _videoCodecSent;
 	IOBuffer _videoBuffer;
 	bool _inboundStreamIsRTP;
@@ -37,8 +38,6 @@ public:
 	OutNetRTMP4TSStream(BaseRTMPProtocol *pProtocol, StreamsManager *pStreamsManager,
 			string name, uint32_t rtmpStreamId, uint32_t chunkSize);
 	virtual ~OutNetRTMP4TSStream();
-
-	virtual void SignalAttachedToInStream();
 
 	virtual bool IsCompatibleWithType(uint64_t type);
 
