@@ -617,6 +617,24 @@
     <ClCompile Include="..\..\..\sources\thelib\src\netio\fdstats.cpp">
       <Filter>Source Files\netio</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\sources\thelib\src\mediaformats\mp4\atomuuid.cpp">
+      <Filter>Source Files\mediaformats\mp4</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\sources\thelib\src\mediaformats\mp4\atomafrt.cpp">
+      <Filter>Source Files\mediaformats\mp4</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\sources\thelib\src\mediaformats\mp4\atomabst.cpp">
+      <Filter>Source Files\mediaformats\mp4</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\sources\thelib\src\mediaformats\mp4\atomafra.cpp">
+      <Filter>Source Files\mediaformats\mp4</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\sources\thelib\src\mediaformats\mp4\atomasrt.cpp">
+      <Filter>Source Files\mediaformats\mp4</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\sources\thelib\src\protocols\variant\jsonvariantprotocol.cpp">
+      <Filter>Source Files\protocols\variant</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\sources\thelib\src\protocols\rtp\nattraversalprotocol.cpp">
       <Filter>Source Files\protocols\rtp</Filter>
     </ClCompile>
@@ -1116,9 +1134,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\sources\thelib\include\netio\fdstats.h">
       <Filter>Header Files\netio</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\sources\thelib\include\protocols\rtp\nattraversalprotocol.h">
-      <Filter>Header Files\protocols\rtp</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

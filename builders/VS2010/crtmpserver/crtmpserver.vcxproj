@@ -50,7 +50,6 @@
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>NotSet</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -61,7 +60,6 @@
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>NotSet</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -70,7 +68,6 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>NotSet</CharacterSet>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -79,7 +76,6 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug static|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>NotSet</CharacterSet>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -111,26 +107,26 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)$(Configuration)\$(PLATFORM)\</OutDir>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Configuration)\$(PLATFORM)\</OutDir>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'">$(SolutionDir)$(Configuration)\$(PLATFORM)\</OutDir>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug static|x64'">$(SolutionDir)$(Configuration)\$(PLATFORM)\</OutDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Configuration)\$(PLATFORM)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Configuration)\$(PLATFORM)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'">$(Configuration)\$(PLATFORM)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug static|x64'">$(Configuration)\$(PLATFORM)\</IntDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)$(Configuration)\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Configuration)\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'">$(SolutionDir)$(Configuration)\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug static|x64'">$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug static|x64'">$(Configuration)\</IntDir>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug static|x64'">true</LinkIncremental>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)$(Configuration)\$(PLATFORM)\</OutDir>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Configuration)\$(PLATFORM)\</OutDir>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'">$(SolutionDir)$(Configuration)\$(PLATFORM)\</OutDir>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release static|x64'">$(SolutionDir)$(Configuration)\$(PLATFORM)\</OutDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(Configuration)\$(PLATFORM)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Configuration)\$(PLATFORM)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'">$(Configuration)\$(PLATFORM)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release static|x64'">$(Configuration)\$(PLATFORM)\</IntDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)$(Configuration)\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Configuration)\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'">$(SolutionDir)$(Configuration)\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release static|x64'">$(SolutionDir)$(Configuration)\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release static|x64'">$(Configuration)\</IntDir>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'">false</LinkIncremental>
@@ -139,7 +135,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>C:\OpenSSL-Win32\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\3rdparty\openssl_build_win32\include;C:\OpenSSL-Win32\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>LITTLE_ENDIAN_BYTE_ALIGNED;NET_SELECT;HAS_LUA;HAS_PROTOCOL_HTTP;HAS_PROTOCOL_RTMP;HAS_PROTOCOL_RTP;HAS_PROTOCOL_LIVEFLV;HAS_PROTOCOL_TS;HAS_PROTOCOL_VAR;HAS_MEDIA_MP3;HAS_MEDIA_MP4;HAS_MEDIA_FLV;VM_LUA;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -168,7 +164,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>C:\OpenSSL-Win32\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\3rdparty\openssl_build_win32\include;C:\OpenSSL-Win32\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>LITTLE_ENDIAN_BYTE_ALIGNED;NET_SELECT;HAS_LUA;HAS_PROTOCOL_HTTP;HAS_PROTOCOL_RTMP;HAS_PROTOCOL_RTP;HAS_PROTOCOL_LIVEFLV;HAS_PROTOCOL_TS;HAS_PROTOCOL_VAR;HAS_MEDIA_MP3;HAS_MEDIA_MP4;HAS_MEDIA_FLV;VM_LUA;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -252,7 +248,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>C:\OpenSSL-Win32\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\3rdparty\openssl_build_win32\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>LITTLE_ENDIAN_BYTE_ALIGNED;NET_SELECT;HAS_LUA;HAS_PROTOCOL_HTTP;HAS_PROTOCOL_RTMP;HAS_PROTOCOL_RTP;HAS_PROTOCOL_LIVEFLV;HAS_PROTOCOL_TS;HAS_PROTOCOL_VAR;HAS_MEDIA_MP3;HAS_MEDIA_MP4;HAS_MEDIA_FLV;VM_LUA;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -264,8 +260,8 @@
       <ForcedIncludeFiles>common.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;shlwapi.lib;libeay32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\OpenSSL-Win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\3rdparty\openssl_build_win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
@@ -283,7 +279,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>C:\dev\openssl-1.0.0f\inc64;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\3rdparty\openssl_build_win32\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>LITTLE_ENDIAN_BYTE_ALIGNED;NET_SELECT;HAS_LUA;HAS_PROTOCOL_HTTP;HAS_PROTOCOL_RTMP;HAS_PROTOCOL_RTP;HAS_PROTOCOL_LIVEFLV;HAS_PROTOCOL_TS;HAS_PROTOCOL_VAR;HAS_MEDIA_MP3;HAS_MEDIA_MP4;HAS_MEDIA_FLV;VM_LUA;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -295,8 +291,8 @@
       <ForcedIncludeFiles>common.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;shlwapi.lib;libeay32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\dev\openssl-1.0.0f\out64dll;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\3rdparty\openssl_build_win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
@@ -304,7 +300,7 @@
     </Link>
     <PostBuildEvent>
       <Message>Copy the config file</Message>
-      <Command>copy ..\..\..\builders\cmake\crtmpserver\crtmpserver.lua "$(SolutionDir)$(Configuration)\$(PLATFORM)\crtmpserver.lua"
+      <Command>copy ..\..\..\builders\cmake\crtmpserver\crtmpserver.lua "$(SolutionDir)$(Configuration)\crtmpserver.lua"
 
 </Command>
     </PostBuildEvent>
@@ -375,9 +371,6 @@
       <Project>{48533e85-275f-40ca-af79-50596aeaac54}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <ProjectReference Include="..\applestreamingclient\applestreamingclient.vcxproj">
-      <Project>{7f201d6a-03f8-4e1e-ac90-1a4e0245774d}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\appselector\appselector.vcxproj">
       <Project>{79ebba73-5ecf-42b6-8c7a-e6c7a2e7acf7}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
@@ -434,9 +427,6 @@
     <None Include="..\..\cmake\crtmpserver\crtmpserver.lua">
       <FileType>Document</FileType>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="..\winIcon.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

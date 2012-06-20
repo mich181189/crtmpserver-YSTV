@@ -50,7 +50,6 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>NotSet</CharacterSet>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -61,7 +60,6 @@
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>NotSet</CharacterSet>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -74,7 +72,6 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>NotSet</CharacterSet>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -87,7 +84,6 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>NotSet</CharacterSet>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -120,42 +116,34 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(OutDir)applications\$(ProjectName)\</OutDir>
-    <IntDir>$(Configuration)\$(PLATFORM)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(OutDir)applications\$(ProjectName)\</OutDir>
-    <IntDir>$(Configuration)\$(PLATFORM)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(OutDir)applications\$(ProjectName)\</OutDir>
-    <IntDir>$(Configuration)\$(PLATFORM)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug static|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(OutDir)applications\$(ProjectName)\</OutDir>
-    <IntDir>$(Configuration)\$(PLATFORM)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(SolutionDir)$(Configuration)\$(PLATFORM)\applications\$(ProjectName)\</OutDir>
-    <IntDir>$(Configuration)\$(PLATFORM)\</IntDir>
+    <OutDir>$(OutDir)applications\$(ProjectName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(SolutionDir)$(Configuration)\$(PLATFORM)\applications\$(ProjectName)\</OutDir>
-    <IntDir>$(Configuration)\$(PLATFORM)\</IntDir>
+    <OutDir>$(OutDir)applications\$(ProjectName)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(OutDir)applications\$(ProjectName)\</OutDir>
-    <IntDir>$(Configuration)\$(PLATFORM)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release static|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(OutDir)applications\$(ProjectName)\</OutDir>
-    <IntDir>$(Configuration)\$(PLATFORM)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -163,7 +151,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>LITTLE_ENDIAN_BYTE_ALIGNED;NET_SELECT;HAS_LUA;HAS_PROTOCOL_HTTP;HAS_PROTOCOL_RTMP;HAS_PROTOCOL_RTP;HAS_PROTOCOL_LIVEFLV;HAS_PROTOCOL_TS;HAS_PROTOCOL_VAR;HAS_MEDIA_MP3;HAS_MEDIA_MP4;HAS_MEDIA_FLV;VM_LUA;WIN32;_DEBUG;_WINDOWS;_USRDLL;APPLESTREAMINGCLIENT_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\OpenSSL-Win32\include;..\..\..\sources\applications\applestreamingclient\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\3rdparty\openssl_build_win32\include;C:\OpenSSL-Win32\include;..\..\..\sources\applications\applestreamingclient\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4996;4251</DisableSpecificWarnings>
       <ForcedIncludeFiles>common.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <PrecompiledHeaderFile>common.h</PrecompiledHeaderFile>
@@ -188,7 +176,7 @@ mkdir "$(OutDir)\mediaFolder"
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>LITTLE_ENDIAN_BYTE_ALIGNED;NET_SELECT;HAS_LUA;HAS_PROTOCOL_HTTP;HAS_PROTOCOL_RTMP;HAS_PROTOCOL_RTP;HAS_PROTOCOL_LIVEFLV;HAS_PROTOCOL_TS;HAS_PROTOCOL_VAR;HAS_MEDIA_MP3;HAS_MEDIA_MP4;HAS_MEDIA_FLV;VM_LUA;WIN32;_DEBUG;_WINDOWS;_USRDLL;APPLESTREAMINGCLIENT_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\OpenSSL-Win32\include;..\..\..\sources\applications\applestreamingclient\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\3rdparty\openssl_build_win32\include;C:\OpenSSL-Win32\include;..\..\..\sources\applications\applestreamingclient\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4996;4251</DisableSpecificWarnings>
       <ForcedIncludeFiles>common.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <PrecompiledHeaderFile>common.h</PrecompiledHeaderFile>
@@ -265,7 +253,7 @@ mkdir "$(OutDir)\mediaFolder"
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>LITTLE_ENDIAN_BYTE_ALIGNED;NET_SELECT;HAS_LUA;HAS_PROTOCOL_HTTP;HAS_PROTOCOL_RTMP;HAS_PROTOCOL_RTP;HAS_PROTOCOL_LIVEFLV;HAS_PROTOCOL_TS;HAS_PROTOCOL_VAR;HAS_MEDIA_MP3;HAS_MEDIA_MP4;HAS_MEDIA_FLV;VM_LUA;WIN32;NDEBUG;_WINDOWS;_USRDLL;APPLESTREAMINGCLIENT_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\OpenSSL-Win32\include;..\..\..\sources\applications\applestreamingclient\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\3rdparty\openssl_build_win32\include;..\..\..\sources\applications\applestreamingclient\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4996;4251</DisableSpecificWarnings>
       <PrecompiledHeaderFile>common.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>common.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
@@ -276,8 +264,8 @@ mkdir "$(OutDir)\mediaFolder"
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <OutputFile>$(OutDir)\$(ProjectName).dll</OutputFile>
-      <AdditionalLibraryDirectories>C:\OpenSSL-Win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ws2_32.lib;shlwapi.lib;libeay32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\3rdparty\openssl_build_win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>rd /Q /S "$(OutDir)\mediaFolder"
@@ -294,7 +282,7 @@ mkdir "$(OutDir)\mediaFolder"
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>LITTLE_ENDIAN_BYTE_ALIGNED;NET_SELECT;HAS_LUA;HAS_PROTOCOL_HTTP;HAS_PROTOCOL_RTMP;HAS_PROTOCOL_RTP;HAS_PROTOCOL_LIVEFLV;HAS_PROTOCOL_TS;HAS_PROTOCOL_VAR;HAS_MEDIA_MP3;HAS_MEDIA_MP4;HAS_MEDIA_FLV;VM_LUA;WIN32;NDEBUG;_WINDOWS;_USRDLL;APPLESTREAMINGCLIENT_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\dev\openssl-1.0.0f\inc64;..\..\..\sources\applications\applestreamingclient\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\3rdparty\openssl_build_win32\include;..\..\..\sources\applications\applestreamingclient\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4996;4251</DisableSpecificWarnings>
       <PrecompiledHeaderFile>common.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>common.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
@@ -305,8 +293,8 @@ mkdir "$(OutDir)\mediaFolder"
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <OutputFile>$(OutDir)\$(ProjectName).dll</OutputFile>
-      <AdditionalLibraryDirectories>C:\dev\openssl-1.0.0f\out64dll;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ws2_32.lib;shlwapi.lib;libeay32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\..\3rdparty\openssl_build_win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>rd /Q /S "$(OutDir)\mediaFolder"

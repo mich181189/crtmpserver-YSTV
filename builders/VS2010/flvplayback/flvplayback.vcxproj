@@ -49,7 +49,6 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <CharacterSet>NotSet</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -60,7 +59,6 @@
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>NotSet</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -69,7 +67,6 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <CharacterSet>NotSet</CharacterSet>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -78,7 +75,6 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug static|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>NotSet</CharacterSet>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -114,22 +110,22 @@
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)applications\$(ProjectName)\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'">$(OutDir)applications\$(ProjectName)\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug static|x64'">$(OutDir)applications\$(ProjectName)\</OutDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Configuration)\$(PLATFORM)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Configuration)\$(PLATFORM)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'">$(Configuration)\$(PLATFORM)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug static|x64'">$(Configuration)\$(PLATFORM)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug static|x64'">$(Configuration)\</IntDir>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug static|Win32'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug static|x64'">true</LinkIncremental>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)$(Configuration)\$(PLATFORM)\applications\$(ProjectName)\</OutDir>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Configuration)\$(PLATFORM)\applications\$(ProjectName)\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)applications\$(ProjectName)\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)applications\$(ProjectName)\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'">$(OutDir)applications\$(ProjectName)\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release static|x64'">$(OutDir)applications\$(ProjectName)\</OutDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(Configuration)\$(PLATFORM)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Configuration)\$(PLATFORM)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'">$(Configuration)\$(PLATFORM)\</IntDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release static|x64'">$(Configuration)\$(PLATFORM)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release static|x64'">$(Configuration)\</IntDir>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release static|Win32'">false</LinkIncremental>
@@ -138,7 +134,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>C:\dev\libpqxx-4.0\include;C:\dev\postgresql-9.1.2\src\include;C:\OpenSSL-Win32\include;..\..\..\sources\applications\flvplayback\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\3rdparty\openssl_build_win32\include;C:\OpenSSL-Win32\include;..\..\..\sources\applications\flvplayback\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>LITTLE_ENDIAN_BYTE_ALIGNED;NET_SELECT;HAS_LUA;HAS_PROTOCOL_HTTP;HAS_PROTOCOL_RTMP;HAS_PROTOCOL_RTP;HAS_PROTOCOL_LIVEFLV;HAS_PROTOCOL_TS;HAS_PROTOCOL_VAR;HAS_MEDIA_MP3;HAS_MEDIA_MP4;HAS_MEDIA_FLV;VM_LUA;WIN32;_DEBUG;_WINDOWS;_USRDLL;FLVPLAYBACK_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -149,12 +145,11 @@
       <DisableSpecificWarnings>4996;4251;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <PrecompiledHeaderFile>common.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>common.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-      <AdditionalOptions>/D"NOMINMAX" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>libpqxx.lib;libpqdll.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)\$(ProjectName).dll</OutputFile>
-      <AdditionalLibraryDirectories>C:\dev\libpqxx-4.0\lib;;C:\dev\postgresql-9.1.2\src\interfaces\libpq\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <TargetMachine>MachineX86</TargetMachine>
@@ -169,7 +164,7 @@ mkdir "$(OutDir)\mediaFolder"
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>C:\dev\libpqxx-4.0\include;C:\dev\postgresql-9.1.2\src\include;C:\OpenSSL-Win32\include;..\..\..\sources\applications\flvplayback\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\3rdparty\openssl_build_win32\include;C:\OpenSSL-Win32\include;..\..\..\sources\applications\flvplayback\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>LITTLE_ENDIAN_BYTE_ALIGNED;NET_SELECT;HAS_LUA;HAS_PROTOCOL_HTTP;HAS_PROTOCOL_RTMP;HAS_PROTOCOL_RTP;HAS_PROTOCOL_LIVEFLV;HAS_PROTOCOL_TS;HAS_PROTOCOL_VAR;HAS_MEDIA_MP3;HAS_MEDIA_MP4;HAS_MEDIA_FLV;VM_LUA;WIN32;_DEBUG;_WINDOWS;_USRDLL;FLVPLAYBACK_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -179,12 +174,11 @@ mkdir "$(OutDir)\mediaFolder"
       <DisableSpecificWarnings>4996;4251;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <PrecompiledHeaderFile>common.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>common.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-      <AdditionalOptions>/D"NOMINMAX" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>libpqxx.lib;libpqdll.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)\$(ProjectName).dll</OutputFile>
-      <AdditionalLibraryDirectories>C:\dev\libpqxx-4.0\lib;;C:\dev\postgresql-9.1.2\src\interfaces\libpq\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
     </Link>
@@ -257,7 +251,7 @@ mkdir "$(OutDir)\mediaFolder"
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>C:\dev\libpqxx-4.0\include;C:\dev\postgresql-9.1.2\src\include;C:\OpenSSL-Win32\include;..\..\..\sources\applications\flvplayback\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\3rdparty\openssl_build_win32\include;..\..\..\sources\applications\flvplayback\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>LITTLE_ENDIAN_BYTE_ALIGNED;NET_SELECT;HAS_LUA;HAS_PROTOCOL_HTTP;HAS_PROTOCOL_RTMP;HAS_PROTOCOL_RTP;HAS_PROTOCOL_LIVEFLV;HAS_PROTOCOL_TS;HAS_PROTOCOL_VAR;HAS_MEDIA_MP3;HAS_MEDIA_MP4;HAS_MEDIA_FLV;VM_LUA;WIN32;NDEBUG;_WINDOWS;_USRDLL;FLVPLAYBACK_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -267,12 +261,11 @@ mkdir "$(OutDir)\mediaFolder"
       <DisableSpecificWarnings>4996;4251;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <PrecompiledHeaderFile>common.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>common.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-      <AdditionalOptions>/D"NOMINMAX" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>libpqxx.lib;libpqdll.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)\$(ProjectName).dll</OutputFile>
-      <AdditionalLibraryDirectories>C:\dev\libpqxx-4.0\lib;;C:\dev\postgresql-9.1.2\src\interfaces\libpq\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\..\3rdparty\openssl_build_win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
@@ -290,7 +283,7 @@ mkdir "$(OutDir)\mediaFolder"
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>C:\dev\libpqxx-4.0\include;C:\dev\postgresql-9.1.2\src\include;C:\OpenSSL-Win32\include;..\..\..\sources\applications\flvplayback\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\3rdparty\openssl_build_win32\include;..\..\..\sources\applications\flvplayback\include;..\..\..\sources\common\include;..\..\..\sources\thelib\include;..\..\..\3rdparty\lua-dev;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>LITTLE_ENDIAN_BYTE_ALIGNED;NET_SELECT;HAS_LUA;HAS_PROTOCOL_HTTP;HAS_PROTOCOL_RTMP;HAS_PROTOCOL_RTP;HAS_PROTOCOL_LIVEFLV;HAS_PROTOCOL_TS;HAS_PROTOCOL_VAR;HAS_MEDIA_MP3;HAS_MEDIA_MP4;HAS_MEDIA_FLV;VM_LUA;WIN32;NDEBUG;_WINDOWS;_USRDLL;FLVPLAYBACK_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -300,12 +293,11 @@ mkdir "$(OutDir)\mediaFolder"
       <DisableSpecificWarnings>4996;4251;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <PrecompiledHeaderFile>common.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>common.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-      <AdditionalOptions>/D"NOMINMAX" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>libpqxx.lib;libpqdll.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)\$(ProjectName).dll</OutputFile>
-      <AdditionalLibraryDirectories>C:\dev\libpqxx-4.0_64\lib;C:\dev\postgresql-9.1.2_64\src\interfaces\libpq\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\..\3rdparty\openssl_build_win32\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
