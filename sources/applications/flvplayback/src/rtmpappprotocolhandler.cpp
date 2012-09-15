@@ -25,10 +25,11 @@
 #include "streaming/baseinnetstream.h"
 #include "streaming/streamstypes.h"
 #include <pqxx/pqxx>
-
+#include <string>
 
 using namespace pqxx;
 using namespace app_flvplayback;
+using namespace std;
 
 //returns true if the database is useable.
 bool checkDB(connection* &con,string dbconstr) {
@@ -96,7 +97,7 @@ string getIP(BaseRTMPProtocol *pFrom) {
 bool RTMPAppProtocolHandler::ProcessInvokeGeneric(BaseRTMPProtocol *pFrom,
 		Variant &request) {
 
-	string functionName = M_INVOKE_FUNCTION(request);
+	std::string functionName = M_INVOKE_FUNCTION(request);
 	if (functionName == "getAvailableFlvs") {
 		return ProcessGetAvailableFlvs(pFrom, request);
 	} else if (functionName == "insertMetadata") {
