@@ -33,6 +33,7 @@ using namespace std;
 
 //returns true if the database is useable.
 bool checkDB(connection* &con,string dbconstr) {
+    INFO("Checking DB connection. If it segfaults here, check you DB settings.");
     if(!con || !con->is_open()) {
         try{
             delete con;
