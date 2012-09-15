@@ -42,7 +42,7 @@ namespace app_flvplayback {
                 Variant connections; //keeps track of connection data, such as time...
                 void client_close(uint32_t id); //does logging and other fun
                 bool ProcessInvokePublish(BaseRTMPProtocol *pFrom,Variant &request);
-                bool ProcessInvokeDeleteStream(BaseRTMPProtocol *pFrom,Variant &request);
+                bool ProcessInvokeFCUnpublish(BaseRTMPProtocol *pFrom,Variant &request);
                 bool ProcessInvokePlay(BaseRTMPProtocol *pFrom,Variant &request);
                 bool ProcessInvokeCloseStream(BaseRTMPProtocol *pFrom,Variant &request);
                 bool ProcessInvoke(BaseRTMPProtocol *pFrom, Variant &request);

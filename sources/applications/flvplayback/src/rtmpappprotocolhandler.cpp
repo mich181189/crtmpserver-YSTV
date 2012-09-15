@@ -103,14 +103,14 @@ bool RTMPAppProtocolHandler::ProcessInvokeGeneric(BaseRTMPProtocol *pFrom,
 	} else if (functionName == "insertMetadata") {
 		return ProcessInsertMetadata(pFrom, request);
 	} else if (functionName == "FCUnpublish") {
-		return ProcessInvokeDeleteStream(pFrom,request); //seems the base class doesn't catch this one, so I'm catching it now.
+		return ProcessInvokeFCUnpublish(pFrom,request); //seems the base class doesn't catch this one, so I'm catching it now.
 	} else {
 		return BaseRTMPAppProtocolHandler::ProcessInvokeGeneric(pFrom, request);
 	}
 }
 
-bool RTMPAppProtocolHandler::ProcessInvokeDeleteStream(BaseRTMPProtocol *pFrom,Variant &request) {
-    string streamNameFull = M_INVOKE_PARAM(request, 1);
+bool RTMPAppProtocolHandler::ProcessInvokeFCUnpublish(BaseRTMPProtocol *pFrom,Variant &request) {
+  string streamNameFull = M_INVOKE_PARAM(request, 1);
 	size_t len = streamNameFull.find('?');
 	string streamName;
 	if(len != string::npos)
@@ -128,8 +128,8 @@ bool RTMPAppProtocolHandler::ProcessInvokeDeleteStream(BaseRTMPProtocol *pFrom,V
             }
             
         }
-    INFO("Stream %s closed.",streamName.c_str());
-    return BaseRTMPAppProtocolHandler::ProcessInvokeDeleteStream(pFrom,request);
+    INFO("Stream %s unpublished.",streamName.c_str());
+    return true;
 }
 
 bool RTMPAppProtocolHandler::ProcessInvokePlay(BaseRTMPProtocol *pFrom,Variant &request) {
