@@ -23,6 +23,8 @@
 #define	_RTMPAPPPROTOCOLHANDLER_H
 #include "protocols/rtmp/basertmpappprotocolhandler.h"
 
+#undef min
+#undef max
 #include <pqxx/pqxx>
 
 namespace app_flvplayback {
