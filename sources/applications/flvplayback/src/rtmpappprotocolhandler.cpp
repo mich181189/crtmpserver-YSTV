@@ -78,6 +78,7 @@ RTMPAppProtocolHandler::RTMPAppProtocolHandler(Variant &configuration)
 }
 
 RTMPAppProtocolHandler::~RTMPAppProtocolHandler() {
+  INFO("AppProtocolHandler being DECONSTRUCTED!");
 	delete dbconn;
 }
 
@@ -99,6 +100,8 @@ bool RTMPAppProtocolHandler::ProcessInvokeGeneric(BaseRTMPProtocol *pFrom,
 		Variant &request) {
 
 	std::string functionName = M_INVOKE_FUNCTION(request);
+  INFO("Attempting to process command");
+  INFO("Command is %s",functionName.c_str());
 	if (functionName == "getAvailableFlvs") {
 		return ProcessGetAvailableFlvs(pFrom, request);
 	} else if (functionName == "insertMetadata") {
@@ -183,7 +186,7 @@ void RTMPAppProtocolHandler::client_close(uint32_t id) {
         try {
             work dbwork(*dbconn);
             stringstream query;
-            query << "UPDATE stream_hits SET duration=CAST('" << duration << " seconds' as interval) WHERE id=" << (string)client["dbid"];
+            query << "UPDATE stream_hits SET duration=CAST('" << duration << " seconds' as interval) WHERE id=" << client["dbid"].ToString();
             dbwork.exec(query.str());
             dbwork.commit();
         } catch(const std::exception &e) {
