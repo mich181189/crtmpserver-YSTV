@@ -182,11 +182,11 @@ void RTMPAppProtocolHandler::client_close(uint32_t id) {
         return; //obviously wasn't for me...
     //Do end stuffs here.
     uint32_t duration = time(NULL) - (uint32_t)client["time"];
-    if(checkDB(dbconn,dbconstring)) {
+    if(checkDB(dbconn,dbconstring) && !client["dbid"].isNull()) {
         try {
             work dbwork(*dbconn);
             stringstream query;
-            query << "UPDATE stream_hits SET duration=CAST('" << duration << " seconds' as interval) WHERE id=" << client["dbid"].ToString();
+            query << "UPDATE stream_hits SET duration=CAST('" << duration << " seconds' as interval) WHERE id=" << (string)client["dbid"];
             dbwork.exec(query.str());
             dbwork.commit();
         } catch(const std::exception &e) {
