@@ -57,6 +57,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <vector>
+#include <queue>
+#include <spawn.h>
 using namespace std;
 
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
@@ -80,8 +82,10 @@ using namespace std;
 #define WRITE_FD write
 #define SOCKET int32_t
 #define LASTSOCKETERROR					errno
-#define SOCKERROR_CONNECT_IN_PROGRESS	EINPROGRESS
-#define SOCKERROR_SEND_IN_PROGRESS		EAGAIN
+#define SOCKERROR_EINPROGRESS			EINPROGRESS
+#define SOCKERROR_EAGAIN				EAGAIN
+#define SOCKERROR_ECONNRESET			ECONNRESET
+#define SOCKERROR_ENOBUFS				ENOBUFS
 #define LIB_HANDLER void *
 #define FREE_LIBRARY(libHandler) dlclose((libHandler))
 #define LOAD_LIBRARY(file,flags) dlopen((file), (flags))
@@ -95,7 +99,7 @@ using namespace std;
 #ifdef MAC_OS_X_VERSION_10_6
 #define HAS_KQUEUE_TIMERS
 #define KQUEUE_TIMER_MULTIPLIER 1000000
-#endif
+#endif /* MAC_OS_X_VERSION_10_6 */
 #define SET_UNKNOWN 0
 #define SET_READ 1
 #define SET_WRITE 2
@@ -109,11 +113,18 @@ using namespace std;
 #define PIOFFT off_t
 
 #define CLOCKS_PER_SECOND CLOCKS_PER_SEC
-#define GETCLOCKS(result) \
+#define GETCLOCKS(result,type) \
 do { \
     struct timeval ___timer___; \
     gettimeofday(&___timer___,NULL); \
-    result=(double)___timer___.tv_sec*(double)CLOCKS_PER_SECOND+(double) ___timer___.tv_usec; \
+    result=(type)___timer___.tv_sec*(type)CLOCKS_PER_SECOND+(type) ___timer___.tv_usec; \
+}while(0);
+
+#define GETMILLISECONDS(result) \
+do { \
+    struct timeval ___timer___; \
+    gettimeofday(&___timer___,NULL); \
+    result=(uint64_t)___timer___.tv_sec*1000+___timer___.tv_usec/1000; \
 }while(0);
 
 #define GETNTP(result) \
@@ -148,6 +159,7 @@ typedef struct _select_event {
 #define IOVEC iovec
 #define MSGHDR_MSG_IOV msg_iov
 #define MSGHDR_MSG_IOVLEN msg_iovlen
+#define MSGHDR_MSG_IOVLEN_TYPE int
 #define MSGHDR_MSG_NAME msg_name
 #define MSGHDR_MSG_NAMELEN msg_namelen
 #define IOVEC_IOV_BASE iov_base
@@ -166,6 +178,8 @@ string lowerCase(string value);
 string upperCase(string value);
 string changeCase(string &value, bool lowerCase);
 string tagToString(uint64_t tag);
+bool setFdJoinMulticast(SOCKET sock, string bindIp, uint16_t bindPort, string ssmIp);
+bool setFdCloseOnExec(int fd);
 bool setFdNonBlock(SOCKET fd);
 bool setFdNoSIGPIPE(SOCKET fd);
 bool setFdKeepAlive(SOCKET fd, bool isUdp);
@@ -195,6 +209,7 @@ bool listFolder(string path, vector<string> &result,
 		bool normalizeAllPaths = true, bool includeFolders = false,
 		bool recursive = true);
 bool moveFile(string src, string dst);
+bool isAbsolutePath(string &path);
 void installSignal(int sig, SignalFnc pSignalFnc);
 void installQuitSignal(SignalFnc pQuitSignalFnc);
 void installConfRereadSignal(SignalFnc pConfRereadSignalFnc);

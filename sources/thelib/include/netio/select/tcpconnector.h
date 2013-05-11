@@ -98,7 +98,7 @@ public:
 			vector<uint64_t>& protocolChain, Variant customParameters) {
 
 		int32_t fd = (int32_t) socket(PF_INET, SOCK_STREAM, 0);
-		if (fd < 0) {
+		if ((fd < 0) || (!setFdCloseOnExec(fd))) {
 			int err = LASTSOCKETERROR;
 			T::SignalProtocolCreated(NULL, customParameters);
 			FATAL("Unable to create fd: %d", err);
@@ -142,7 +142,7 @@ public:
 
 		if (connect(_inboundFd, (sockaddr *) & address, sizeof (address)) != 0) {
 			int err = LASTSOCKETERROR;
-			if (err != SOCKERROR_CONNECT_IN_PROGRESS) {
+			if (err != SOCKERROR_EINPROGRESS) {
 				FATAL("Unable to connect to %s:%hu %d", STR(_ip), _port, err);
 				_closeSocket = true;
 				return false;
